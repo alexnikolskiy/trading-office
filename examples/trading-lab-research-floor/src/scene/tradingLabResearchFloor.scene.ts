@@ -29,12 +29,15 @@ export const FLOOR_THEMES: Record<
       hoverColor: '#0a84ff',
       selectionColor: '#e8590c',
       floorLabelColor: '#7a6850',
-      statusBadgeScale: 1.4,
+      statusBadgeScale: 1.1,
+      // Desks sit above the agents now — lift badges clear of the monitors.
+      statusBadgeOffsetY: 44,
       agentLabel: {
-        color: '#f4f7fc',
-        backgroundColor: '#2b3142',
-        backgroundAlpha: 0.78,
-        fontSize: 9,
+        // Desk nameplate under the workstation.
+        color: '#3b3120',
+        backgroundColor: '#e7dcbe',
+        backgroundAlpha: 0.92,
+        fontSize: 8,
       },
       objectLabel: {
         color: '#eef2f8',
@@ -54,12 +57,13 @@ export const FLOOR_THEMES: Record<
       hoverColor: '#7ef7ff',
       selectionColor: '#ffd166',
       floorLabelColor: '#54648c',
-      statusBadgeScale: 1.4,
+      statusBadgeScale: 1.1,
+      statusBadgeOffsetY: 44,
       agentLabel: {
         color: '#d4dcf0',
         backgroundColor: '#10131f',
-        backgroundAlpha: 0.7,
-        fontSize: 9,
+        backgroundAlpha: 0.8,
+        fontSize: 8,
       },
       objectLabel: {
         color: '#9fb2d8',
@@ -86,9 +90,8 @@ const PROP_SPRITES: Array<{ key: string; file: string; frameWidth: number }> = [
   { key: 'prop:hypothesis_board', file: 'hypothesis-board', frameWidth: 96 },
   { key: 'prop:bot_status_monitor', file: 'bot-status-monitor', frameWidth: 48 },
   { key: 'prop:archive_shelf', file: 'archive-shelf', frameWidth: 64 },
-  { key: 'prop:server_rack', file: 'server-rack', frameWidth: 64 },
-  { key: 'prop:boss_console', file: 'boss-console', frameWidth: 144 },
-  { key: 'prop:holo_table', file: 'holo-table', frameWidth: 96 },
+  { key: 'prop:server_rack', file: 'server-rack', frameWidth: 56 },
+  { key: 'prop:boss_console', file: 'boss-console', frameWidth: 128 },
 ];
 
 export function createTradingLabResearchFloorScene(
@@ -213,29 +216,22 @@ export function createTradingLabResearchFloorScene(
         panelTarget: 'boss-commands',
         sprite: 'prop:boss_console',
       },
-      {
-        id: 'holo-table',
-        type: 'data_table',
-        label: 'Data Table',
-        panelTarget: 'shared-context',
-        sprite: 'prop:holo_table',
-        showLabel: false,
-      },
     ],
 
     camera: {
       defaultZoom: 'fit',
-      fitPadding: 24,
+      fitPadding: 16,
       minZoom: 0.5,
-      maxZoom: 5,
+      maxZoom: 6,
     },
 
     labels: {
       agents: true,
       objects: true,
-      floor: true,
-      // Agent chips stay visible; object labels appear on hover so they
-      // never cover the furniture.
+      // No decorative floor text in Iteration 2.
+      floor: false,
+      // Agent nameplates stay visible under the workstations; object labels
+      // appear on hover so they never cover the furniture.
       agentMode: 'always',
       objectMode: 'hover',
     },

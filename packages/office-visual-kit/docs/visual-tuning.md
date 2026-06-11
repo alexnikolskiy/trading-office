@@ -13,9 +13,13 @@ Positions are geometry → they live in the map.
   `npm run generate:map`. Vite picks the new map up on reload.
 - **Hand-authored map**: open the `.tmj` in Tiled, drag things, re-export.
 
-Agents are anchored at the feet; to put an agent "behind" a desk, place the
-spawn point a couple of pixels below the desk's top edge — depth sorting does
-the rest.
+Agents are anchored at the feet and face their desks. A workstation is a
+2×2 desk block (`desk_<variant>_tl/tr/bl/br` tiles: monitor in the upper
+half, keyboard at the lower edge) plus a back-facing agent spawned at the
+block's bottom-center, feet ≈2 px above the next tile row — the agent's head
+then tucks under the desk edge and never reads as "standing on the desk".
+Keep one empty tile row below each agent so the desk nameplate has floor
+under it before the next workstation starts.
 
 ## Change the palette
 
@@ -36,7 +40,7 @@ The example ships two themes sharing one geometry. Each theme is:
 
 1. a generated tileset image (`office-tileset-<theme>.png`);
 2. a generated map (`trading-lab-research-floor-<theme>.tmj`) that differs
-   only in tileset image, background color and floor-label color;
+   only in tileset image and background color;
 3. a `Partial<OfficeSceneTheme>` block in
    `src/scene/tradingLabResearchFloor.scene.ts` (`FLOOR_THEMES`).
 
@@ -49,12 +53,20 @@ themes are entirely data.
 ## Labels that don't cover furniture
 
 - `labels.agentMode` / `labels.objectMode` in the scene config: `'always'`
-  (default) or `'hover'` — the example keeps agent chips always-on and shows
-  object labels only on hover.
-- Chip font size lives in `theme.agentLabel.fontSize` /
-  `theme.objectLabel.fontSize`; `theme.statusBadgeScale` scales the status
-  pills for larger tile sizes.
+  (default) or `'hover'` — the example keeps agent nameplates always-on and
+  shows object labels only on hover.
+- Agent chips render just below the feet — with the agent under its desk
+  this lands at the bottom edge of the workstation, like a desk nameplate.
+  Style it via `theme.agentLabel` (the day theme uses a light plate +
+  dark text); font size lives in `agentLabel.fontSize` /
+  `objectLabel.fontSize`.
+- `theme.statusBadgeScale` scales the status pills;
+  `theme.statusBadgeOffsetY` lifts them above the agent — the example uses
+  `44` so badges float clear of the monitor that now sits above each agent.
+  `statusBadgeText: false` switches badges to dot-only.
 - Per-entity opt-out: `showLabel: false` on any agent/object entry.
+- `labels.floor: false` (example default) — no decorative floor text; zones
+  read through layout and furniture instead.
 
 ## Replace an asset with better art
 
@@ -70,8 +82,11 @@ Nothing else changes — entity code references assets only by key.
 ## Add a new agent role
 
 1. Add a style to `ROLE_STYLES` in `tools/lib/palette.mjs` (skin/hair/top/
-   accent + optional accessory: `cap`, `glasses`, `headset`, `tie`) and run
-   `npm run generate:assets` — you get `agent-<role>.png` for free.
+   accent + `hairStyle`: `short`/`long`/`ponytail`/`bun` + optional
+   accessory: `cap`, `headset`; `executive: true` gives the tall command
+   chair) and run `npm run generate:assets` — you get `agent-<role>.png`
+   for free. Remember the agent is seen from behind: differentiate roles
+   with hair, shirt color and head-level accessories.
 2. Register `{ key: 'agent:<role>', url: ... }` in the scene config assets.
 3. Use the role in an `agents` entry. Custom role strings are allowed by the
    schema; nothing in the kit needs patching.
@@ -97,15 +112,17 @@ Nothing else changes — entity code references assets only by key.
 
 ## Density / noise control
 
-- Fewer-but-larger props read better than many small ones.
+- Fewer-but-larger props read better than many small ones; chunky 2× art
+  pixels (draw at logical 16, `upscale()` ×2) beat micro-detail.
 - The plank seams and floor grain live in `tools/lib/tiles.mjs`
   (`plankFloor`, the `floorSeam`/`plank` colors) — soften them there if the
   grid feels heavy at your target zoom.
-- Workstation rugs are 9-slice zones (`rugZone()` in `generate-map.mjs`) —
-  resize or recolor them (`rug*` / `brug*` palette entries) instead of adding
-  ad-hoc floor rectangles.
-- `labels.floor: false` hides zone text; `statusBadgeText: false` switches
-  badges to dot-only — both reduce visual noise instantly.
+- The command rug is a 9-slice zone (`rugZone()` in `generate-map.mjs`,
+  `brug*` palette entries) — resize or recolor it instead of adding ad-hoc
+  floor rectangles; keep rugs rare and intentional.
+- Furniture follows office logic: cabinets/shelves against walls, break area
+  (vending + coffee + cooler + trash) along a wall, infra grouped in one
+  corner, plants in seams and corners — never random props in open floor.
 
 ## Iteration loop after visual feedback
 

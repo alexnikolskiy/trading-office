@@ -47,6 +47,12 @@ export interface OfficeSceneTheme {
    * larger tiles so badges keep their size relative to the scene.
    */
   statusBadgeScale?: number;
+  /**
+   * Extra world-space pixels between the agent sprite top and its status
+   * badge (default 0). Raise it on floors where the desk/monitor sits above
+   * the agent so badges float clear of the workstation.
+   */
+  statusBadgeOffsetY?: number;
   agentLabel?: Partial<OfficeSceneThemeLabelStyle>;
   objectLabel?: Partial<OfficeSceneThemeLabelStyle>;
 }

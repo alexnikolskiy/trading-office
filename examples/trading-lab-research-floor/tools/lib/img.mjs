@@ -150,6 +150,30 @@ export class Img {
   }
 }
 
+/**
+ * Nearest-neighbor upscale. All Visual Iteration 2 art is drawn on a logical
+ * 16px grid and upscaled ×2 onto the 32px tiles — one "chunky" art pixel is
+ * 2×2 real pixels, which keeps shapes large and silhouettes readable.
+ */
+export function upscale(src, k = 2) {
+  const out = new Img(src.width * k, src.height * k);
+  for (let y = 0; y < src.height; y++) {
+    for (let x = 0; x < src.width; x++) {
+      const si = (y * src.width + x) * 4;
+      for (let dy = 0; dy < k; dy++) {
+        for (let dx = 0; dx < k; dx++) {
+          const di = ((y * k + dy) * out.width + (x * k + dx)) * 4;
+          out.data[di] = src.data[si];
+          out.data[di + 1] = src.data[si + 1];
+          out.data[di + 2] = src.data[si + 2];
+          out.data[di + 3] = src.data[si + 3];
+        }
+      }
+    }
+  }
+  return out;
+}
+
 /** Concatenate equally sized frames into one horizontal strip. */
 export function strip(frames) {
   const [first] = frames;

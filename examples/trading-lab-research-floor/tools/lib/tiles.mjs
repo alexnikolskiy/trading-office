@@ -1,4 +1,4 @@
-import { Img, makeRng, seedFromString } from './img.mjs';
+import { Img, makeRng, seedFromString, upscale } from './img.mjs';
 import { nightify, PAL } from './palette.mjs';
 
 /**
@@ -6,9 +6,16 @@ import { nightify, PAL } from './palette.mjs';
  * order: local tile id = index, gid = index + 1 (firstgid = 1).
  * `generate-map.mjs` imports the same module, so map and image never drift.
  *
- * All art is drawn once in the Day Office palette; the night tileset is
+ * Visual Iteration 2: all art is drawn on a logical 16-px grid and upscaled
+ * ×2 onto the 32-px tiles ("chunky" classic pixel-art — large shapes, no
+ * micro-detail). Drawn once in the Day Office palette; the night tileset is
  * derived via `nightify()` (see palette.mjs). Tiles that need real night art
  * (windows) are `themed` and draw per theme.
+ *
+ * Workstations are turned away from the viewer: the desk is a 2×2-tile
+ * block (monitor upper half, desk + keyboard lower half) and the agent sits
+ * BELOW it, facing the screen. Screens carry a single glowing glyph — no
+ * fake charts.
  */
 
 export const TILE_SIZE = 32;
@@ -29,69 +36,67 @@ function copyRegion(img, src, sx, sy) {
   }
 }
 
+/** Wrap a logical-16 draw function into a 32-px tile draw. */
+function chunky(draw) {
+  return (img, theme) => {
+    const logical = new Img(img.width / 2, img.height / 2);
+    draw(logical, theme);
+    img.blit(upscale(logical, 2), 0, 0);
+  };
+}
+
 // ---------------------------------------------------------------------------
-// floors
+// floors (logical 16×16)
 // ---------------------------------------------------------------------------
 
 function plankFloor(img, seed, base) {
   const rng = makeRng(seed);
-  img.rect(0, 0, 32, 32, base);
-  // grain noise
-  for (let y = 0; y < 32; y++) {
-    for (let x = 0; x < 32; x++) {
+  img.rect(0, 0, 16, 16, base);
+  for (let y = 0; y < 16; y++) {
+    for (let x = 0; x < 16; x++) {
       const r = rng();
-      if (r < 0.035) img.px(x, y, PAL.plankHi);
-      else if (r > 0.965) img.px(x, y, PAL.plank);
+      if (r < 0.03) img.px(x, y, PAL.plankHi);
+      else if (r > 0.97) img.px(x, y, PAL.plank);
     }
   }
-  // horizontal plank seams every 8px + staggered butt joints
+  // plank seams every 4 logical px + staggered butt joints
   for (let band = 0; band < 4; band++) {
-    const y = band * 8 + 7;
-    img.hline(0, 31, y, PAL.floorSeam);
-    const joint = (band * 13 + Math.floor(rng() * 8) * 4) % 32;
-    img.vline(joint, band * 8, y - 1, PAL.plank);
+    const y = band * 4 + 3;
+    img.hline(0, 15, y, PAL.floorSeam);
+    const joint = (band * 7 + Math.floor(rng() * 4) * 4) % 16;
+    img.vline(joint, band * 4, y - 1, PAL.plank);
   }
 }
 
 function rugTile(img, edges, colors) {
-  img.rect(0, 0, 32, 32, colors.base);
-  for (let y = 0; y < 32; y++) {
-    for (let x = 0; x < 32; x++) {
+  img.rect(0, 0, 16, 16, colors.base);
+  for (let y = 0; y < 16; y++) {
+    for (let x = 0; x < 16; x++) {
       if ((x * 7 + y * 5) % 13 < 2) img.px(x, y, colors.dot);
     }
   }
   if (edges.top) {
-    img.hline(0, 31, 0, colors.edge);
-    img.hline(0, 31, 1, colors.border);
-    img.hline(0, 31, 2, colors.border);
+    img.hline(0, 15, 0, colors.edge);
+    img.hline(0, 15, 1, colors.border);
   }
   if (edges.bottom) {
-    img.hline(0, 31, 31, colors.edge);
-    img.hline(0, 31, 30, colors.border);
-    img.hline(0, 31, 29, colors.border);
+    img.hline(0, 15, 15, colors.edge);
+    img.hline(0, 15, 14, colors.border);
   }
   if (edges.left) {
-    img.vline(0, 0, 31, colors.edge);
-    img.vline(1, 0, 31, colors.border);
-    img.vline(2, 0, 31, colors.border);
+    img.vline(0, 0, 15, colors.edge);
+    img.vline(1, 0, 15, colors.border);
   }
   if (edges.right) {
-    img.vline(31, 0, 31, colors.edge);
-    img.vline(30, 0, 31, colors.border);
-    img.vline(29, 0, 31, colors.border);
+    img.vline(15, 0, 15, colors.edge);
+    img.vline(14, 0, 15, colors.border);
   }
-  if (colors.corner && edges.top && edges.left) img.rect(4, 4, 2, 2, colors.corner);
-  if (colors.corner && edges.top && edges.right) img.rect(26, 4, 2, 2, colors.corner);
-  if (colors.corner && edges.bottom && edges.left) img.rect(4, 26, 2, 2, colors.corner);
-  if (colors.corner && edges.bottom && edges.right) img.rect(26, 26, 2, 2, colors.corner);
+  if (colors.corner && edges.top && edges.left) img.px(3, 3, colors.corner);
+  if (colors.corner && edges.top && edges.right) img.px(12, 3, colors.corner);
+  if (colors.corner && edges.bottom && edges.left) img.px(3, 12, colors.corner);
+  if (colors.corner && edges.bottom && edges.right) img.px(12, 12, colors.corner);
 }
 
-const RUG_COLORS = {
-  base: PAL.rug,
-  dot: PAL.rugDot,
-  border: PAL.rugBorder,
-  edge: PAL.rugEdge,
-};
 const BOSS_RUG_COLORS = {
   base: PAL.brug,
   dot: PAL.brugDot,
@@ -113,310 +118,291 @@ const RUG_EDGES = {
 };
 
 // ---------------------------------------------------------------------------
-// walls
+// walls (logical 16×16)
 // ---------------------------------------------------------------------------
 
 function wallCap(img) {
-  img.rect(0, 0, 32, 32, PAL.wallTop);
-  img.hline(0, 31, 0, PAL.wallTopHi);
-  img.hline(0, 31, 1, PAL.wallTopHi);
-  img.hline(0, 31, 30, PAL.wallTopLo);
-  img.hline(0, 31, 31, PAL.wallTopLo);
-  img.vline(15, 2, 29, PAL.wallTopLo);
+  img.rect(0, 0, 16, 16, PAL.wallTop);
+  img.hline(0, 15, 0, PAL.wallTopHi);
+  img.hline(0, 15, 15, PAL.wallTopLo);
+  img.vline(7, 1, 14, PAL.wallTopLo);
 }
 
 function wallFaceUpper(img) {
-  img.rect(0, 0, 32, 32, PAL.wallFace);
-  img.hline(0, 31, 0, PAL.wallFaceHi);
-  img.hline(0, 31, 1, PAL.wallFaceHi);
-  // faint panel seams
-  img.vline(31, 2, 31, PAL.wallSeam);
+  img.rect(0, 0, 16, 16, PAL.wallFace);
+  img.hline(0, 15, 0, PAL.wallFaceHi);
+  img.vline(15, 1, 15, PAL.wallSeam);
 }
 
 function wallFaceLower(img) {
-  img.rect(0, 0, 32, 12, PAL.wallFace);
-  img.vline(31, 0, 11, PAL.wallSeam);
-  // wainscot band
-  img.hline(0, 31, 12, PAL.wainscotLine);
-  img.rect(0, 13, 32, 14, PAL.wainscot);
-  img.vline(7, 14, 25, PAL.wainscotLine);
-  img.vline(23, 14, 25, PAL.wainscotLine);
-  img.hline(0, 31, 26, PAL.wainscotLine);
-  // baseboard
-  img.rect(0, 27, 32, 4, PAL.baseboard);
-  img.hline(0, 31, 31, PAL.baseboardLo);
+  img.rect(0, 0, 16, 6, PAL.wallFace);
+  img.vline(15, 0, 5, PAL.wallSeam);
+  img.hline(0, 15, 6, PAL.wainscotLine);
+  img.rect(0, 7, 16, 6, PAL.wainscot);
+  img.vline(3, 8, 12, PAL.wainscotLine);
+  img.vline(11, 8, 12, PAL.wainscotLine);
+  img.rect(0, 13, 16, 3, PAL.baseboard);
+  img.hline(0, 15, 15, PAL.baseboardLo);
 }
 
 // ---------------------------------------------------------------------------
-// big multi-tile art (windows, door, bookshelf, vending)
+// big multi-tile art (logical, cached, upscaled once)
 // ---------------------------------------------------------------------------
+
+function wallBacking32() {
+  const img = new Img(32, 32);
+  for (const ox of [0, 16]) {
+    const u = new Img(16, 16);
+    wallFaceUpper(u);
+    img.blit(u, ox, 0);
+    const l = new Img(16, 16);
+    wallFaceLower(l);
+    img.blit(l, ox, 16);
+  }
+  return img;
+}
 
 let _winDay = null;
 let _winNight = null;
 
+function windowDayLogical() {
+  const img = wallBacking32();
+  // frame
+  img.rect(2, 1, 28, 21, PAL.frame);
+  img.outline(2, 1, 28, 21, PAL.frameDark);
+  img.hline(3, 28, 2, PAL.frameHi);
+  // glass
+  img.rect(4, 3, 24, 17, PAL.sky);
+  img.rect(4, 3, 24, 5, PAL.skyHi);
+  // sun + clouds
+  img.rect(6, 4, 4, 3, PAL.sun);
+  img.px(7, 3, PAL.sun);
+  img.rect(12, 6, 6, 2, PAL.cloud);
+  img.rect(20, 11, 5, 2, PAL.cloud);
+  img.rect(7, 13, 4, 2, PAL.cloud);
+  // mullions
+  img.rect(15, 3, 2, 17, PAL.frame);
+  img.rect(4, 11, 24, 1, PAL.frame);
+  // sill
+  img.rect(1, 22, 30, 2, PAL.sill);
+  img.hline(1, 30, 23, PAL.frameDark);
+  return img;
+}
+
 function windowBig() {
   if (_winDay) return _winDay;
-  const img = new Img(64, 64);
-  // wall behind (upper face rows + lower face rows)
-  for (const ox of [0, 32]) {
-    const u = new Img(32, 32);
-    wallFaceUpper(u);
-    img.blit(u, ox, 0);
-    const l = new Img(32, 32);
-    wallFaceLower(l);
-    img.blit(l, ox, 32);
-  }
-  // frame
-  img.rect(4, 2, 56, 42, PAL.frame);
-  img.outline(4, 2, 56, 42, PAL.frameDark);
-  img.hline(5, 58, 3, PAL.frameHi);
-  // glass
-  img.rect(8, 6, 48, 34, PAL.sky);
-  img.rect(8, 6, 48, 10, PAL.skyHi);
-  // sun glow top-left
-  img.rect(10, 8, 8, 5, PAL.sun);
-  img.rect(12, 7, 4, 7, PAL.sun);
-  // clouds
-  img.rect(24, 12, 12, 3, PAL.cloud);
-  img.rect(28, 10, 6, 3, PAL.cloud);
-  img.rect(40, 22, 10, 3, PAL.cloud);
-  img.rect(14, 26, 9, 3, PAL.cloud);
-  // mullions
-  img.rect(30, 6, 3, 34, PAL.frame);
-  img.rect(8, 21, 48, 2, PAL.frame);
-  // sill
-  img.rect(2, 44, 60, 4, PAL.sill);
-  img.hline(2, 61, 44, PAL.frameHi);
-  img.hline(2, 61, 47, PAL.frameDark);
-  _winDay = img;
-  return img;
+  return (_winDay = upscale(windowDayLogical(), 2));
 }
 
 function windowNightBig() {
   if (_winNight) return _winNight;
-  const img = nightify(windowBig());
-  // re-draw the glass with real night art
+  const img = nightify(windowDayLogical());
   const glass = (x, y, w, h) => {
     img.rect(x, y, w, h, PAL.nightSky);
-    img.rect(x, y, w, 6, PAL.nightSkyHi);
+    img.rect(x, y, w, 2, PAL.nightSkyHi);
   };
-  glass(8, 6, 22, 15);
-  glass(33, 6, 23, 15);
-  glass(8, 23, 22, 17);
-  glass(33, 23, 23, 17);
+  glass(4, 3, 11, 8);
+  glass(17, 3, 11, 8);
+  glass(4, 12, 11, 8);
+  glass(17, 12, 11, 8);
   // moon + stars
-  img.rect(44, 9, 5, 5, PAL.moon);
-  img.px(44, 9, PAL.nightSkyHi);
-  img.px(48, 13, PAL.nightSkyHi);
+  img.rect(22, 4, 3, 3, PAL.moon);
+  img.px(22, 4, PAL.nightSkyHi);
   for (const [x, y, dim] of [
-    [13, 10, false],
-    [21, 8, true],
-    [27, 14, false],
-    [37, 12, true],
-    [53, 17, false],
-    [11, 26, true],
-    [25, 25, false],
-    [50, 27, true],
+    [6, 5, false],
+    [10, 4, true],
+    [13, 7, false],
+    [19, 6, true],
+    [26, 8, false],
+    [6, 13, true],
+    [12, 14, false],
+    [25, 14, true],
   ]) {
     img.px(x, y, dim ? PAL.starDim : PAL.star);
   }
   // city skyline at the bottom of the glass
   for (const [x, w, h] of [
-    [9, 5, 6],
-    [16, 4, 9],
-    [22, 6, 5],
-    [34, 5, 8],
-    [41, 4, 5],
-    [47, 7, 7],
+    [5, 3, 3],
+    [9, 2, 5],
+    [12, 3, 2],
+    [18, 2, 4],
+    [21, 3, 2],
+    [25, 3, 4],
   ]) {
-    img.rect(x, 40 - h, w, h, PAL.city);
-    img.px(x + 1, 40 - h + 2, PAL.cityLit);
-    if (w > 4) img.px(x + 3, 40 - h + 4, PAL.cityLit);
+    img.rect(x, 20 - h, w, h, PAL.city);
+    img.px(x + 1, 20 - h + 1, PAL.cityLit);
   }
-  _winNight = img;
-  return img;
+  return (_winNight = upscale(img, 2));
 }
 
 let _door = null;
 
 function doorBig() {
   if (_door) return _door;
-  const img = new Img(64, 64);
-  for (const ox of [0, 32]) {
-    const u = new Img(32, 32);
-    wallFaceUpper(u);
-    img.blit(u, ox, 0);
-    const l = new Img(32, 32);
-    wallFaceLower(l);
-    img.blit(l, ox, 32);
-  }
-  // door frame + opening
-  img.rect(10, 4, 44, 60, PAL.doorFrame);
-  img.rect(13, 7, 38, 57, PAL.door);
-  img.hline(13, 50, 7, PAL.doorHi);
-  img.vline(13, 7, 63, PAL.doorHi);
+  const img = wallBacking32();
+  // transom + frame + opening
+  img.rect(9, 0, 14, 2, PAL.doorFrame);
+  img.rect(5, 2, 22, 30, PAL.doorFrame);
+  img.rect(7, 4, 18, 28, PAL.door);
+  img.hline(7, 24, 4, PAL.doorHi);
+  img.vline(7, 4, 31, PAL.doorHi);
   // two leaves
-  img.vline(31, 8, 63, PAL.doorDark);
-  img.vline(32, 8, 63, PAL.doorDark);
+  img.vline(15, 5, 31, PAL.doorDark);
+  img.vline(16, 5, 31, PAL.doorDark);
   // inset panels
-  for (const ox of [16, 35]) {
-    img.outline(ox, 12, 13, 20, PAL.doorDark);
-    img.outline(ox, 38, 13, 20, PAL.doorDark);
-    img.hline(ox + 1, ox + 11, 12, PAL.doorDark);
+  for (const ox of [9, 18]) {
+    img.outline(ox, 7, 5, 8, PAL.doorDark);
+    img.outline(ox, 19, 5, 8, PAL.doorDark);
   }
   // handles
-  img.rect(27, 34, 3, 6, PAL.handle);
-  img.rect(34, 34, 3, 6, PAL.handle);
-  // small transom window
-  img.rect(18, 1, 28, 3, PAL.doorFrame);
-  return (_door = img);
+  img.rect(13, 16, 2, 3, PAL.handle);
+  img.rect(17, 16, 2, 3, PAL.handle);
+  return (_door = upscale(img, 2));
 }
 
 let _shelf = null;
 
 function bookshelfBig() {
   if (_shelf) return _shelf;
-  const img = new Img(32, 64);
-  // body
-  img.rect(2, 0, 28, 62, PAL.shelfFrame);
-  img.outline(2, 0, 28, 62, PAL.shelfDark);
-  img.hline(3, 28, 1, '#a87f55');
+  const img = new Img(16, 32);
+  img.rect(1, 1, 14, 29, PAL.shelfFrame);
+  img.outline(1, 1, 14, 29, PAL.shelfDark);
+  img.hline(2, 14, 2, '#a87f55');
   const spines = ['#b85a50', '#5878b8', '#58a070', '#c9a23e', '#8a6acd', '#d08848'];
-  // three book shelves
   for (let shelf = 0; shelf < 3; shelf++) {
-    const y = 4 + shelf * 13;
-    img.rect(4, y, 24, 11, PAL.shelfDark);
-    img.hline(3, 28, y + 11, PAL.shelfBoard);
-    img.hline(3, 28, y + 12, PAL.shelfDark);
-    for (let i = 0; i < 6; i++) {
+    const y = 4 + shelf * 7;
+    img.rect(3, y, 10, 5, PAL.shelfDark);
+    img.hline(2, 13, y + 5, PAL.shelfBoard);
+    for (let i = 0; i < 5; i++) {
       const color = spines[(i + shelf * 2) % spines.length];
-      const h = 8 + ((i * 5 + shelf * 3) % 3);
-      img.rect(5 + i * 4, y + 11 - h, 3, h, color);
-      img.px(5 + i * 4, y + 11 - h, '#00000033');
+      const h = 4 + ((i + shelf) % 2);
+      img.rect(3 + i * 2, y + 5 - h, 2, h, color);
     }
-    // a leaning book
-    if (shelf === 1) img.rect(26, y + 4, 2, 7, spines[(shelf + 3) % spines.length]);
   }
   // lower cabinet
-  img.rect(4, 44, 24, 14, PAL.shelfBoard);
-  img.outline(4, 44, 24, 14, PAL.shelfDark);
-  img.vline(16, 45, 57, PAL.shelfDark);
-  img.rect(13, 50, 2, 3, PAL.handle);
-  img.rect(18, 50, 2, 3, PAL.handle);
+  img.rect(3, 25, 10, 4, PAL.shelfBoard);
+  img.outline(3, 25, 10, 4, PAL.shelfDark);
+  img.vline(8, 26, 28, PAL.shelfDark);
+  img.px(6, 27, PAL.handle);
+  img.px(10, 27, PAL.handle);
   // feet
-  img.rect(4, 62, 4, 2, PAL.shelfDark);
-  img.rect(24, 62, 4, 2, PAL.shelfDark);
-  return (_shelf = img);
+  img.rect(2, 30, 3, 2, PAL.shelfDark);
+  img.rect(11, 30, 3, 2, PAL.shelfDark);
+  return (_shelf = upscale(img, 2));
 }
 
 let _vending = null;
 
 function vendingBig() {
   if (_vending) return _vending;
-  const img = new Img(32, 64);
-  img.rect(4, 0, 24, 62, PAL.vending);
-  img.outline(4, 0, 24, 62, PAL.vendingDark);
-  img.hline(5, 26, 1, PAL.vendingHi);
-  img.vline(5, 1, 60, PAL.vendingHi);
+  const img = new Img(16, 32);
+  img.rect(2, 0, 12, 30, PAL.vending);
+  img.outline(2, 0, 12, 30, PAL.vendingDark);
+  img.vline(3, 1, 28, PAL.vendingHi);
   // header
-  img.rect(7, 3, 18, 4, PAL.vendingDark);
-  img.hline(9, 14, 4, PAL.cyan);
-  img.hline(17, 22, 5, PAL.cyan);
+  img.rect(4, 2, 8, 2, PAL.vendingDark);
+  img.hline(5, 9, 2, PAL.cyan);
   // product window
-  img.rect(7, 9, 14, 34, PAL.screenDeep);
-  img.outline(7, 9, 14, 34, PAL.vendingDark);
+  img.rect(4, 6, 7, 15, PAL.screenDeep);
+  img.outline(4, 6, 7, 15, PAL.vendingDark);
   const snacks = ['#d08848', '#b85a50', '#58a070', '#c9a23e', '#5878b8', '#c46a9a'];
   for (let row = 0; row < 4; row++) {
-    const y = 11 + row * 8;
+    const y = 7 + row * 4;
     for (let i = 0; i < 3; i++) {
-      img.rect(9 + i * 4, y, 3, 5, snacks[(row + i * 2) % snacks.length]);
+      img.rect(5 + i * 2, y, 1, 2, snacks[(row + i * 2) % snacks.length]);
     }
-    img.hline(8, 19, y + 6, '#3a414e');
+    img.hline(5, 10, y + 2, '#3a414e');
   }
   // coin panel
-  img.rect(23, 12, 4, 12, PAL.steelPanel);
-  img.px(24, 14, PAL.amber);
-  img.rect(24, 18, 2, 4, '#10131f');
+  img.rect(12, 7, 2, 6, PAL.steelPanel);
+  img.px(12, 8, PAL.amber);
   // dispense slot
-  img.rect(7, 47, 14, 8, PAL.steelPanel);
-  img.rect(9, 49, 10, 4, '#10131f');
+  img.rect(4, 23, 7, 4, PAL.steelPanel);
+  img.rect(5, 24, 5, 2, '#10131f');
   // feet
-  img.rect(6, 62, 5, 2, PAL.vendingDark);
-  img.rect(21, 62, 5, 2, PAL.vendingDark);
-  return (_vending = img);
+  img.rect(3, 30, 3, 2, PAL.vendingDark);
+  img.rect(10, 30, 3, 2, PAL.vendingDark);
+  return (_vending = upscale(img, 2));
 }
 
 // ---------------------------------------------------------------------------
-// desks & seats
+// workstation desks (2×2 tiles: monitor above, desk + keyboard below;
+// the agent sits in front, facing the screen)
 // ---------------------------------------------------------------------------
 
-function deskSurface(img, side) {
-  // desk top (rows 0..23), front face (24..29), legs + floor gap below
-  img.rect(0, 0, 32, 22, PAL.deskTop);
-  img.hline(0, 31, 0, PAL.deskHi);
-  img.hline(0, 31, 1, PAL.deskHi);
-  img.hline(0, 31, 9, PAL.deskGrain);
-  img.hline(0, 31, 16, PAL.deskGrain);
-  img.hline(0, 31, 22, PAL.deskDark);
-  img.rect(0, 23, 32, 6, PAL.deskFace);
-  img.hline(0, 31, 28, PAL.deskDark);
-  if (side === 'left') {
-    img.vline(0, 0, 28, PAL.deskDark);
-    img.rect(1, 29, 3, 3, PAL.deskLeg);
+const _desks = new Map();
+
+function deskBig(variant) {
+  const cached = _desks.get(variant);
+  if (cached) return cached;
+  const img = new Img(32, 32);
+
+  // --- lower half: the desk itself -----------------------------------------
+  img.rect(2, 16, 28, 11, PAL.deskTop);
+  img.hline(2, 29, 16, PAL.deskHi);
+  img.hline(2, 29, 17, PAL.deskHi);
+  img.hline(3, 28, 21, PAL.deskGrain);
+  img.hline(3, 28, 24, PAL.deskGrain);
+  img.hline(2, 29, 26, PAL.deskDark);
+  img.vline(2, 16, 26, PAL.deskDark);
+  img.vline(29, 16, 26, PAL.deskDark);
+  // front face + legs
+  img.rect(3, 27, 26, 3, PAL.deskFace);
+  img.hline(3, 28, 29, PAL.deskDark);
+  img.rect(4, 30, 2, 2, PAL.deskLeg);
+  img.rect(26, 30, 2, 2, PAL.deskLeg);
+
+  // --- monitor centred on the seam, screen facing the agent ----------------
+  img.rect(15, 14, 2, 3, PAL.bezelDark); // stand
+  img.hline(13, 18, 17, PAL.bezelDark); // foot
+  img.rect(10, 3, 12, 12, PAL.bezel);
+  img.outline(10, 3, 12, 12, PAL.bezelDark);
+  img.hline(11, 20, 4, PAL.bezelHi);
+  img.rect(12, 5, 8, 8, PAL.screen);
+
+  // a single glowing glyph — no fake charts
+  if (variant === 'a') {
+    // tiny equalizer pulse
+    img.rect(14, 10, 1, 2, PAL.cyanDim);
+    img.rect(16, 8, 1, 4, PAL.cyan);
+    img.rect(18, 9, 1, 3, PAL.cyanDim);
   } else {
-    img.vline(31, 0, 28, PAL.deskDark);
-    img.rect(28, 29, 3, 3, PAL.deskLeg);
+    // terminal prompt
+    img.px(13, 7, PAL.green);
+    img.px(14, 8, PAL.green);
+    img.px(13, 9, PAL.green);
+    img.rect(16, 9, 2, 1, PAL.greenDim);
   }
-}
 
-function monitorOnDesk(img, drawScreen) {
-  // bezel + stand + keyboard + mouse
-  img.rect(6, 1, 20, 13, PAL.bezel);
-  img.outline(6, 1, 20, 13, PAL.bezelDark);
-  img.hline(7, 24, 1, PAL.bezelHi);
-  img.rect(8, 3, 16, 9, PAL.screen);
-  drawScreen(img);
-  img.rect(14, 14, 4, 2, PAL.bezelDark);
-  img.rect(11, 16, 10, 1, PAL.bezel);
-  // keyboard
-  img.rect(8, 18, 15, 4, PAL.keyboard);
-  img.outline(8, 18, 15, 4, PAL.keyboardDark);
-  for (let x = 10; x <= 20; x += 2) img.px(x, 19, PAL.keyboardKeys);
-  for (let x = 11; x <= 21; x += 2) img.px(x, 20, PAL.keyboardKeys);
-  // mouse + pad
-  img.rect(25, 18, 5, 4, '#b8a888');
-  img.rect(26, 18, 3, 3, PAL.keyboard);
-  img.px(27, 18, PAL.keyboardDark);
-}
+  // --- keyboard + mouse at the agent edge -----------------------------------
+  img.rect(11, 20, 10, 3, PAL.keyboard);
+  img.outline(11, 20, 10, 3, PAL.keyboardDark);
+  for (let x = 12; x <= 19; x += 2) img.px(x, 21, PAL.keyboardKeys);
+  img.rect(23, 21, 2, 2, PAL.keyboard);
+  img.px(23, 21, PAL.keyboardDark);
 
-function screenChart(img) {
-  const pts = [
-    [9, 10],
-    [11, 8],
-    [13, 9],
-    [15, 7],
-    [17, 7],
-    [19, 5],
-    [21, 6],
-    [23, 4],
-  ];
-  for (let i = 0; i < pts.length - 1; i++) {
-    img.line(pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1], PAL.cyan);
+  // --- desk dressing per variant --------------------------------------------
+  if (variant === 'a') {
+    // mug with steam
+    img.rect(5, 18, 3, 3, PAL.mug);
+    img.hline(5, 7, 18, PAL.mugHi);
+    img.px(8, 19, PAL.mug);
+    img.px(6, 16, PAL.steam);
+  } else {
+    // papers + tiny succulent
+    img.rect(4, 18, 5, 4, PAL.paper);
+    img.px(4, 21, PAL.paperShade);
+    img.hline(5, 7, 19, PAL.paperLine);
+    img.hline(5, 7, 20, PAL.paperLine);
+    img.rect(26, 20, 3, 2, PAL.pot);
+    img.px(27, 18, PAL.leaf);
+    img.px(26, 19, PAL.leafDark);
+    img.px(28, 19, PAL.leafHi);
   }
-  img.hline(9, 23, 11, PAL.cyanDark);
-  img.px(23, 4, '#d4fff2');
-}
 
-function screenCode(img) {
-  img.hline(9, 15, 4, PAL.green);
-  img.hline(10, 19, 6, PAL.greenDim);
-  img.hline(9, 13, 8, PAL.greenDim);
-  img.hline(10, 17, 10, PAL.green);
-  img.px(21, 10, PAL.green);
-}
-
-function deskItemsBase(img) {
-  deskSurface(img, 'right');
+  const up = upscale(img, 2);
+  _desks.set(variant, up);
+  return up;
 }
 
 // ---------------------------------------------------------------------------
@@ -426,119 +412,92 @@ function deskItemsBase(img) {
 export const TILE_DEFS = [
   {
     name: 'floor_a',
-    draw(img) {
-      plankFloor(img, seedFromString('floor_a'), PAL.floorA);
-    },
+    draw: chunky((img) => plankFloor(img, seedFromString('floor_a'), PAL.floorA)),
   },
   {
     name: 'floor_b',
-    draw(img) {
-      plankFloor(img, seedFromString('floor_b'), PAL.floorB);
-    },
+    draw: chunky((img) => plankFloor(img, seedFromString('floor_b'), PAL.floorB)),
   },
   {
     name: 'floor_shadow',
-    draw(img) {
+    draw: chunky((img) => {
       plankFloor(img, seedFromString('floor_shadow'), PAL.floorB);
-      img.rect(0, 0, 32, 4, '#54401f88');
-      img.rect(0, 4, 32, 3, '#54401f44');
-    },
+      img.rect(0, 0, 16, 2, '#54401f88');
+      img.hline(0, 15, 2, '#54401f44');
+    }),
   },
-  {
-    name: 'doormat',
-    draw(img) {
-      plankFloor(img, seedFromString('doormat'), PAL.floorB);
-      img.rect(2, 4, 28, 24, PAL.matBase);
-      img.outline(2, 4, 28, 24, PAL.matLine);
-      img.outline(4, 6, 24, 20, PAL.matHi);
-      for (let i = 0; i < 6; i++) img.hline(7, 24, 9 + i * 3, PAL.matLine);
-    },
-  },
-  ...Object.entries(RUG_EDGES).map(([key, edges]) => ({
-    name: `rug_${key}`,
-    draw(img) {
-      rugTile(img, edges, RUG_COLORS);
-    },
+  // one wide doormat under the door, split over two tiles
+  ...['l', 'r'].map((side) => ({
+    name: `doormat_${side}`,
+    draw: chunky((img) => {
+      plankFloor(img, seedFromString(`doormat_${side}`), PAL.floorB);
+      const x = side === 'l' ? 2 : 0;
+      const w = side === 'l' ? 14 : 14;
+      img.rect(x, 3, w, 11, PAL.matBase);
+      img.hline(x, x + w - 1, 3, PAL.matLine);
+      img.hline(x, x + w - 1, 13, PAL.matLine);
+      img.hline(x, x + w - 1, 4, PAL.matHi);
+      if (side === 'l') img.vline(2, 3, 13, PAL.matLine);
+      else img.vline(13, 3, 13, PAL.matLine);
+      for (let i = 0; i < 3; i++) img.hline(x + 2, x + w - 3, 6 + i * 3, PAL.matLine);
+    }),
   })),
   ...Object.entries(RUG_EDGES).map(([key, edges]) => ({
     name: `brug_${key}`,
-    draw(img) {
-      rugTile(img, edges, BOSS_RUG_COLORS);
-    },
+    draw: chunky((img) => rugTile(img, edges, BOSS_RUG_COLORS)),
   })),
-  {
-    name: 'wall_top',
-    draw(img) {
-      wallCap(img);
-    },
-  },
-  {
-    name: 'wall_face_u',
-    draw(img) {
-      wallFaceUpper(img);
-    },
-  },
-  {
-    name: 'wall_face_l',
-    draw(img) {
-      wallFaceLower(img);
-    },
-  },
+  { name: 'wall_top', draw: chunky(wallCap) },
+  { name: 'wall_face_u', draw: chunky(wallFaceUpper) },
+  { name: 'wall_face_l', draw: chunky(wallFaceLower) },
   {
     name: 'wall_vent',
-    draw(img) {
+    draw: chunky((img) => {
       wallFaceUpper(img);
-      img.rect(8, 10, 16, 12, PAL.vent);
-      img.outline(8, 10, 16, 12, PAL.ventDark);
-      for (const y of [13, 16, 19]) img.hline(10, 21, y, PAL.ventDark);
-    },
+      img.rect(4, 5, 8, 6, PAL.vent);
+      img.outline(4, 5, 8, 6, PAL.ventDark);
+      img.hline(5, 10, 7, PAL.ventDark);
+      img.hline(5, 10, 9, PAL.ventDark);
+    }),
   },
   {
     name: 'wall_clock',
-    draw(img) {
+    draw: chunky((img) => {
       wallFaceUpper(img);
-      // simple round wall clock
-      img.rect(11, 7, 10, 10, PAL.clockRim);
-      img.px(11, 7, PAL.wallFace);
-      img.px(20, 7, PAL.wallFace);
-      img.px(11, 16, PAL.wallFace);
-      img.px(20, 16, PAL.wallFace);
-      img.rect(12, 8, 8, 8, PAL.clockFace);
-      img.vline(15, 9, 12, '#3a414e');
-      img.hline(16, 18 - 1, 12, '#3a414e');
-      img.px(16, 12, '#b8554f');
-    },
+      img.rect(5, 3, 6, 6, PAL.clockRim);
+      img.px(5, 3, PAL.wallFace);
+      img.px(10, 3, PAL.wallFace);
+      img.px(5, 8, PAL.wallFace);
+      img.px(10, 8, PAL.wallFace);
+      img.rect(6, 4, 4, 4, PAL.clockFace);
+      img.px(7, 5, '#3a414e');
+      img.px(8, 6, '#b8554f');
+    }),
   },
   {
     name: 'poster',
-    draw(img) {
+    draw: chunky((img) => {
       wallFaceUpper(img);
-      img.rect(8, 5, 16, 21, PAL.paper);
-      img.outline(8, 5, 16, 21, '#8a7a5e');
-      img.hline(10, 21, 8, PAL.paperLine);
-      // little equity-curve print
-      img.line(10, 20, 14, 16, PAL.cyanDim);
-      img.line(14, 16, 17, 18, PAL.cyanDim);
-      img.line(17, 18, 21, 12, PAL.cyanDim);
-      img.hline(10, 21, 22, PAL.paperLine);
-    },
+      img.rect(4, 2, 8, 11, PAL.paper);
+      img.outline(4, 2, 8, 11, '#8a7a5e');
+      img.hline(5, 10, 4, PAL.paperLine);
+      img.line(5, 10, 7, 8, PAL.cyanDim);
+      img.line(7, 8, 8, 9, PAL.cyanDim);
+      img.line(8, 9, 10, 6, PAL.cyanDim);
+    }),
   },
   {
     name: 'notice_board',
-    draw(img) {
+    draw: chunky((img) => {
       wallFaceUpper(img);
-      img.rect(5, 6, 22, 18, PAL.cork);
-      img.outline(5, 6, 22, 18, PAL.shelfDark);
-      img.outline(6, 7, 20, 16, PAL.corkDark);
-      // pinned notes
-      img.rect(8, 9, 6, 6, PAL.paper);
-      img.rect(16, 10, 6, 5, '#e7d089');
-      img.rect(10, 17, 6, 5, '#bcd8a8');
-      img.rect(19, 17, 5, 5, PAL.paperShade);
-      img.px(10, 9, PAL.red);
-      img.px(18, 10, '#5878b8');
-      img.px(12, 17, '#b8554f');
-    },
+      img.rect(2, 3, 12, 9, PAL.cork);
+      img.outline(2, 3, 12, 9, PAL.shelfDark);
+      img.rect(4, 5, 3, 3, PAL.paper);
+      img.rect(8, 5, 3, 2, '#e7d089');
+      img.rect(5, 9, 3, 2, '#bcd8a8');
+      img.rect(10, 8, 3, 3, PAL.paperShade);
+      img.px(5, 5, PAL.red);
+      img.px(9, 5, '#5878b8');
+    }),
   },
   // 2×2 window (themed: day sky / night sky)
   ...['tl', 'tr', 'bl', 'br'].map((corner, i) => ({
@@ -556,89 +515,15 @@ export const TILE_DEFS = [
       copyRegion(img, doorBig(), (i % 2) * 32, Math.floor(i / 2) * 32);
     },
   })),
-  {
-    name: 'desk_mon_chart',
-    draw(img) {
-      deskSurface(img, 'left');
-      monitorOnDesk(img, screenChart);
-    },
-  },
-  {
-    name: 'desk_mon_code',
-    draw(img) {
-      deskSurface(img, 'left');
-      monitorOnDesk(img, screenCode);
-    },
-  },
-  {
-    name: 'desk_items_lamp',
-    draw(img) {
-      deskItemsBase(img);
-      // papers
-      img.rect(3, 12, 9, 7, PAL.paperShade);
-      img.rect(5, 11, 9, 7, PAL.paper);
-      img.hline(6, 12, 13, PAL.paperLine);
-      img.hline(6, 12, 15, PAL.paperLine);
-      // mug
-      img.rect(16, 15, 4, 5, PAL.mug);
-      img.hline(16, 19, 15, PAL.mugHi);
-      img.vline(21, 16, 18, PAL.mug);
-      img.px(17, 12, PAL.steam);
-      img.px(18, 10, PAL.steam);
-      // desk lamp (arm + warm glowing shade)
-      img.rect(23, 16, 6, 2, PAL.steelPanel);
-      img.line(26, 15, 23, 7, PAL.steelDark);
-      img.rect(20, 4, 8, 3, PAL.steelPanel);
-      img.hline(20, 27, 7, PAL.gold);
-      img.px(21, 8, PAL.sun);
-      img.px(24, 8, PAL.sun);
-    },
-  },
-  {
-    name: 'desk_items_docs',
-    draw(img) {
-      deskItemsBase(img);
-      // document stack
-      img.rect(4, 8, 11, 9, PAL.paperShade);
-      img.rect(6, 7, 11, 9, PAL.paper);
-      img.hline(7, 14, 9, PAL.paperLine);
-      img.hline(7, 14, 11, PAL.paperLine);
-      img.hline(7, 12, 13, PAL.paperLine);
-      // sticky notes
-      img.rect(20, 8, 5, 5, '#e7d089');
-      img.rect(24, 14, 5, 5, '#bcd8a8');
-      // pen
-      img.line(6, 20, 12, 18, '#3a414e');
-      // tiny succulent
-      img.rect(26, 4, 4, 3, PAL.pot);
-      img.px(27, 2, PAL.leaf);
-      img.px(28, 3, PAL.leafHi);
-      img.px(26, 3, PAL.leafDark);
-    },
-  },
-  {
-    name: 'chair_office',
-    draw(img) {
-      // empty office chair, front view
-      img.rect(9, 2, 14, 13, PAL.chair);
-      img.outline(9, 2, 14, 13, PAL.chairDark);
-      img.hline(10, 21, 3, PAL.chairHi);
-      img.rect(8, 15, 16, 6, PAL.chairDark);
-      img.hline(9, 22, 15, PAL.chairHi);
-      // armrests
-      img.rect(5, 10, 3, 8, PAL.chairDark);
-      img.rect(24, 10, 3, 8, PAL.chairDark);
-      // column + star base
-      img.rect(14, 21, 4, 5, PAL.chairLeg);
-      img.line(15, 26, 7, 29, PAL.chairLeg);
-      img.line(16, 26, 24, 29, PAL.chairLeg);
-      img.vline(15, 26, 29, PAL.chairLeg);
-      img.vline(16, 26, 29, PAL.chairLeg);
-      img.rect(6, 29, 3, 2, PAL.chairLeg);
-      img.rect(23, 29, 3, 2, PAL.chairLeg);
-      img.rect(14, 29, 4, 2, PAL.chairLeg);
-    },
-  },
+  // 2×2 workstation desks, two dressing variants
+  ...['a', 'b'].flatMap((variant) =>
+    ['tl', 'tr', 'bl', 'br'].map((corner, i) => ({
+      name: `desk_${variant}_${corner}`,
+      draw(img) {
+        copyRegion(img, deskBig(variant), (i % 2) * 32, Math.floor(i / 2) * 32);
+      },
+    })),
+  ),
   {
     name: 'bookshelf_top',
     draw(img) {
@@ -653,72 +538,55 @@ export const TILE_DEFS = [
   },
   {
     name: 'plant_big',
-    draw(img) {
-      // pot
-      img.rect(10, 22, 12, 8, PAL.pot);
-      img.hline(9, 22, 22, PAL.potRim);
-      img.hline(9, 22, 23, PAL.potRim);
-      img.rect(12, 30, 8, 2, PAL.shelfDark);
-      // foliage
-      img.rect(9, 6, 14, 16, PAL.leafDark);
-      img.rect(7, 9, 18, 10, PAL.leafDark);
-      img.rect(11, 3, 10, 8, PAL.leaf);
-      img.rect(8, 10, 6, 6, PAL.leaf);
-      img.rect(18, 11, 6, 6, PAL.leaf);
-      img.px(13, 2, PAL.leafHi);
-      img.px(17, 4, PAL.leafHi);
-      img.px(9, 11, PAL.leafHi);
-      img.px(22, 12, PAL.leafHi);
-      img.px(15, 8, PAL.leafHi);
-      img.vline(15, 16, 22, PAL.shelfDark);
-      img.vline(16, 16, 22, PAL.shelfDark);
-    },
+    draw: chunky((img) => {
+      img.rect(5, 11, 6, 4, PAL.pot);
+      img.hline(4, 11, 11, PAL.potRim);
+      img.rect(6, 15, 4, 1, PAL.shelfDark);
+      img.rect(4, 3, 8, 8, PAL.leafDark);
+      img.rect(5, 2, 6, 5, PAL.leaf);
+      img.rect(3, 5, 3, 4, PAL.leaf);
+      img.rect(10, 5, 3, 4, PAL.leafDark);
+      img.px(6, 2, PAL.leafHi);
+      img.px(9, 4, PAL.leafHi);
+      img.px(4, 6, PAL.leafHi);
+    }),
   },
   {
     name: 'plant_small',
-    draw(img) {
-      img.rect(12, 21, 8, 6, PAL.pot);
-      img.hline(11, 20, 21, PAL.potRim);
-      img.rect(13, 27, 6, 1, PAL.shelfDark);
-      img.rect(12, 12, 8, 9, PAL.leafDark);
-      img.rect(14, 10, 5, 6, PAL.leaf);
-      img.px(15, 9, PAL.leafHi);
-      img.px(13, 13, PAL.leafHi);
-      img.px(19, 14, PAL.leaf);
-    },
+    draw: chunky((img) => {
+      img.rect(6, 11, 4, 3, PAL.pot);
+      img.hline(5, 10, 11, PAL.potRim);
+      img.rect(6, 6, 4, 5, PAL.leafDark);
+      img.rect(7, 5, 2, 4, PAL.leaf);
+      img.px(7, 4, PAL.leafHi);
+      img.px(6, 7, PAL.leafHi);
+    }),
   },
   {
     name: 'trash_bin',
-    draw(img) {
-      img.rect(10, 14, 12, 15, PAL.bin);
-      img.outline(10, 14, 12, 15, PAL.binDark);
-      img.vline(13, 15, 27, PAL.binDark);
-      img.vline(18, 15, 27, PAL.binDark);
-      img.vline(11, 15, 27, PAL.binHi);
-      img.rect(9, 12, 14, 3, PAL.binDark);
-      img.hline(10, 21, 12, PAL.binHi);
-      img.rect(11, 11, 10, 1, '#23282f');
-    },
+    draw: chunky((img) => {
+      img.rect(5, 7, 6, 7, PAL.bin);
+      img.outline(5, 7, 6, 7, PAL.binDark);
+      img.vline(7, 8, 13, PAL.binDark);
+      img.vline(6, 8, 13, PAL.binHi);
+      img.rect(4, 5, 8, 2, PAL.binDark);
+      img.hline(5, 10, 5, PAL.binHi);
+    }),
   },
   {
     name: 'water_cooler',
-    draw(img) {
-      // bottle
-      img.rect(11, 3, 10, 8, PAL.bottle);
-      img.outline(11, 3, 10, 8, '#6da8c8');
-      img.px(13, 4, PAL.bottleHi);
-      img.px(14, 5, PAL.bottleHi);
-      // body
-      img.rect(9, 11, 14, 18, PAL.cooler);
-      img.outline(9, 11, 14, 18, PAL.coolerDark);
-      img.vline(21, 12, 28, PAL.coolerShade);
-      img.rect(12, 15, 8, 3, PAL.coolerShade);
-      img.px(13, 16, '#5878b8');
-      img.px(18, 16, PAL.redDim);
-      img.rect(13, 19, 6, 3, '#3a414e');
-      img.rect(10, 29, 4, 2, PAL.coolerDark);
-      img.rect(18, 29, 4, 2, PAL.coolerDark);
-    },
+    draw: chunky((img) => {
+      img.rect(5, 1, 6, 4, PAL.bottle);
+      img.outline(5, 1, 6, 4, '#6da8c8');
+      img.px(6, 2, PAL.bottleHi);
+      img.rect(4, 5, 8, 9, PAL.cooler);
+      img.outline(4, 5, 8, 9, PAL.coolerDark);
+      img.rect(6, 7, 4, 2, PAL.coolerShade);
+      img.px(6, 7, '#5878b8');
+      img.px(9, 7, PAL.redDim);
+      img.rect(5, 14, 2, 1, PAL.coolerDark);
+      img.rect(9, 14, 2, 1, PAL.coolerDark);
+    }),
   },
   {
     name: 'vending_top',
@@ -734,27 +602,25 @@ export const TILE_DEFS = [
   },
   {
     name: 'cabinet_coffee',
-    draw(img) {
+    draw: chunky((img) => {
       // low cabinet
-      img.rect(2, 16, 28, 14, PAL.shelfFrame);
-      img.outline(2, 16, 28, 14, PAL.shelfDark);
-      img.hline(3, 28, 17, '#a87f55');
-      img.vline(16, 18, 28, PAL.shelfDark);
-      img.rect(12, 22, 2, 3, PAL.handle);
-      img.rect(18, 22, 2, 3, PAL.handle);
+      img.rect(1, 8, 14, 7, PAL.shelfFrame);
+      img.outline(1, 8, 14, 7, PAL.shelfDark);
+      img.hline(2, 13, 9, '#a87f55');
+      img.vline(8, 10, 14, PAL.shelfDark);
+      img.px(6, 11, PAL.handle);
+      img.px(10, 11, PAL.handle);
       // coffee machine on top
-      img.rect(6, 3, 12, 13, PAL.steel);
-      img.outline(6, 3, 12, 13, PAL.steelDark);
-      img.rect(8, 5, 8, 3, PAL.steelPanel);
-      img.px(15, 6, PAL.green);
-      img.rect(8, 10, 5, 4, PAL.amberDim);
-      img.px(9, 11, PAL.amber);
-      img.px(10, 1, PAL.steam);
-      img.px(11, 0, PAL.steam);
+      img.rect(3, 2, 6, 6, PAL.steel);
+      img.outline(3, 2, 6, 6, PAL.steelDark);
+      img.rect(4, 3, 4, 2, PAL.steelPanel);
+      img.px(7, 4, PAL.green);
+      img.rect(4, 6, 2, 2, PAL.amberDim);
+      img.px(4, 1, PAL.steam);
       // cups
-      img.rect(21, 11, 4, 4, PAL.paper);
-      img.rect(25, 12, 3, 3, PAL.paperShade);
-    },
+      img.rect(11, 5, 2, 3, PAL.paper);
+      img.rect(13, 6, 1, 2, PAL.paperShade);
+    }),
   },
 ];
 

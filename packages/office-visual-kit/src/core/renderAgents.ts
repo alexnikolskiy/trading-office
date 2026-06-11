@@ -61,7 +61,10 @@ export class AgentView implements EntityView {
     this.container.addChild(sprite);
 
     this.badge = badgeRenderer.create(entity.status);
-    this.badge.container.position.set(0, -this.spriteHeight - 3);
+    this.badge.container.position.set(
+      0,
+      -this.spriteHeight - 3 - (theme.statusBadgeOffsetY ?? 0),
+    );
     this.container.addChild(this.badge.container);
 
     if (options.showLabel) {

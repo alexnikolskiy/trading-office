@@ -15,6 +15,12 @@ to reproduce byte-for-byte).
 - Both theme tilesets (`office-tileset-day.png`, `office-tileset-night.png`)
   come from the same drawing pass: night is derived from the day art by
   `nightify()` in `tools/lib/palette.mjs`.
+- The agent characters are LPC-*inspired* (silhouette/variety ideas only)
+  but are fully original pixels drawn by `tools/lib/agents.mjs` — no LPC
+  spritesheets, parts, or palettes were used. Real LPC assets, if ever
+  added, must live under `assets/third-party/lpc/` with
+  `SOURCE.md` + `ATTRIBUTIONS.md` + `LICENSES.md` and must never be labeled
+  generated/CC0 (see `packages/office-visual-kit/docs/asset-guidelines.md`).
 
 Third-party assets (none at the moment) must live under
 `assets/third-party/<source>/` with `SOURCE.md` + license files — see

@@ -55,19 +55,15 @@ export const PAL = {
   floorSeam: '#a8814f',
   floorShadow1: '#94713f',
   floorShadow2: '#b08a58',
-  matBase: '#7d8a96',
-  matLine: '#6b7884',
-  matHi: '#8e9aa6',
+  matBase: '#94806a',
+  matLine: '#7c6a56',
+  matHi: '#a6927c',
 
   // --- office rugs -----------------------------------------------------------
-  rug: '#b2b8b4',
-  rugDot: '#bdc3bf',
-  rugBorder: '#9aa19c',
-  rugEdge: '#878f8a',
-  brug: '#a99bc9',
-  brugDot: '#b8abd5',
-  brugBorder: '#8d7fb2',
-  brugEdge: '#7c6fa2',
+  brug: '#a39ab8',
+  brugDot: '#aba2c0',
+  brugBorder: '#8a81a4',
+  brugEdge: '#797194',
   brugGold: '#caa54b',
 
   // --- day walls -------------------------------------------------------------
@@ -125,6 +121,9 @@ export const PAL = {
   chairDark: '#3c4860',
   chairHi: '#5e6c88',
   chairLeg: '#2f3848',
+  execChair: '#463e62',
+  execChairDark: '#352e4c',
+  execChairHi: '#5a5078',
 
   // --- amenities -----------------------------------------------------------------
   pot: '#b06a48',
@@ -166,9 +165,6 @@ export const PAL = {
   consoleTopHi: '#695c98',
   consoleFace: '#463c6e',
   consoleLeg: '#332b54',
-  holoTable: '#3e4a62',
-  holoRim: '#56657f',
-  holoLeg: '#2b3447',
 };
 
 /** Colors that keep glowing in the derived night tileset. */
@@ -205,94 +201,94 @@ export function nightify(img) {
   return out;
 }
 
-/** Per-role colors for agent sprites. `pose` picks the body template. */
+/**
+ * Per-role looks for the back-facing seated agents (LPC-inspired, fully
+ * original). Agents are seen from behind / slightly above, so a role reads
+ * through hair style + color, shirt color on the shoulders, and head-level
+ * accessories that survive the back view (cap, headset, bun, ponytail).
+ *
+ * `executive: true` switches to the tall command chair (Boss).
+ */
 export const ROLE_STYLES = {
   boss: {
     skin: '#e8b48c',
-    skinShade: '#d39e76',
-    hair: '#2b2536',
-    top: '#5a3f86',
-    topShade: '#4a3370',
+    hair: '#3d3450',
+    hairShade: '#2e2840',
+    top: '#5a4a96',
+    topShade: '#4a3d7e',
     accent: '#ffd166',
-    accessory: 'tie',
     hairStyle: 'short',
-    pose: 'standing',
+    accessory: null,
+    executive: true,
   },
   strategy_analyst: {
     skin: '#c98c5e',
-    skinShade: '#b67c50',
     hair: '#1c2638',
+    hairShade: '#141c2a',
     top: '#2f96a3',
     topShade: '#26818c',
     accent: '#59f7d4',
-    accessory: null,
     hairStyle: 'long',
-    pose: 'seated',
+    accessory: null,
   },
   researcher: {
     skin: '#f0c8a0',
-    skinShade: '#dcb389',
     hair: '#7a4a2e',
+    hairShade: '#633b24',
     top: '#4a945d',
     topShade: '#3d7e4e',
     accent: '#d8efc8',
-    accessory: 'glasses',
-    hairStyle: 'short',
-    pose: 'seated',
+    hairStyle: 'bun',
+    accessory: null,
   },
   critic: {
     skin: '#e8b48c',
-    skinShade: '#d39e76',
     hair: '#6e3636',
+    hairShade: '#592b2b',
     top: '#cd803a',
     topShade: '#b26c2e',
     accent: '#ff5d5d',
-    accessory: null,
     hairStyle: 'short',
-    pose: 'seated',
+    accessory: null,
   },
   builder: {
     skin: '#c98c5e',
-    skinShade: '#b67c50',
     hair: '#3a2a1c',
+    hairShade: '#2d2015',
     top: '#3e6cb4',
     topShade: '#345a98',
     accent: '#e09040',
-    accessory: 'cap',
     hairStyle: 'short',
-    pose: 'seated',
+    accessory: 'cap',
   },
   evaluator: {
     skin: '#f0c8a0',
-    skinShade: '#dcb389',
     hair: '#c9a23e',
+    hairShade: '#a98631',
     top: '#5d61b2',
     topShade: '#4e5298',
     accent: '#8ec4ff',
+    hairStyle: 'ponytail',
     accessory: null,
-    hairStyle: 'long',
-    pose: 'seated',
   },
   performance_monitor: {
     skin: '#e8b48c',
-    skinShade: '#d39e76',
     hair: '#2e4434',
+    hairShade: '#243629',
     top: '#56a268',
     topShade: '#478a57',
     accent: '#69e85e',
-    accessory: 'headset',
     hairStyle: 'short',
-    pose: 'seated',
+    accessory: 'headset',
   },
   knowledge_curator: {
     skin: '#d8a878',
-    skinShade: '#c69566',
     hair: '#8a7ab0',
+    hairShade: '#746597',
     top: '#8a76c4',
     topShade: '#7563ab',
     accent: '#ffd166',
-    accessory: null,
     hairStyle: 'long',
-    pose: 'seated',
+    accessory: null,
   },
 };

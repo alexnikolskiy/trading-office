@@ -117,7 +117,8 @@ Status → badge color mapping lives in the theme (`statusColors`), defaults in
   floorLabelColor: '#7a6850',
   statusColors: { running: '#59f7d4', /* … */ },
   statusBadgeText: true,           // false → dot-only badges
-  statusBadgeScale: 1.4,           // badge size relative to the world (1 = 16px-tile sizing)
+  statusBadgeScale: 1.1,           // badge size relative to the world (1 = 16px-tile sizing)
+  statusBadgeOffsetY: 44,          // extra px above the sprite — lift badges over the desk monitor
   agentLabel: { color, backgroundColor, backgroundAlpha, fontSize },
   objectLabel: { /* same shape */ },
 }

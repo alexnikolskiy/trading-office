@@ -19,12 +19,14 @@ plausible agent statuses (preview-side only — no real API).
 
 ## What's on the floor
 
-Agents: Boss/Orchestrator (violet/gold, command console), Strategy Analyst,
-Researcher, Critic/Risk Reviewer, Builder, Evaluator, Performance Monitor.
+Agents: Boss/Orchestrator (violet/gold, executive chair at the central
+command desk), Strategy Analyst, Researcher, Critic/Risk Reviewer, Builder,
+Evaluator, Performance Monitor. Everyone sits with their back to the viewer,
+facing their desk monitor; role/name labels are nameplates under each
+workstation.
 
 Interactive objects: Hypothesis Board, Wall Monitor (backtests), Bot Status
-Monitor, Archive Shelf, Server Rack / Data Node, Boss Console, Holo Data
-Table.
+Monitor, Archive Shelf, Server Rack / Data Node, Boss Console.
 
 ## Structure
 
