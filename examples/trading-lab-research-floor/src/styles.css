@@ -53,6 +53,39 @@ body,
   color: var(--text-dim);
 }
 
+.topbar-controls {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.theme-toggle {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.theme-btn {
+  padding: 6px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.theme-btn + .theme-btn {
+  border-left: 1px solid var(--border);
+}
+
+.theme-btn[data-active='true'] {
+  background: var(--border);
+  color: var(--text);
+}
+
 .sim-toggle {
   display: flex;
   align-items: center;

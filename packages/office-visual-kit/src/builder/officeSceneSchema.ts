@@ -42,6 +42,11 @@ export interface OfficeSceneTheme {
   statusColors?: Partial<Record<AgentStatus, string>>;
   /** Render short status text next to the badge dot. */
   statusBadgeText?: boolean;
+  /**
+   * World-space scale of status badges (default 1). Bump for floors with
+   * larger tiles so badges keep their size relative to the scene.
+   */
+  statusBadgeScale?: number;
   agentLabel?: Partial<OfficeSceneThemeLabelStyle>;
   objectLabel?: Partial<OfficeSceneThemeLabelStyle>;
 }
@@ -124,6 +129,13 @@ export interface OfficeSceneConfig {
     objects?: boolean;
     /** Show decorative floor labels from the map (default true). */
     floor?: boolean;
+    /**
+     * 'always' (default) keeps agent label chips visible; 'hover' shows a
+     * chip only while its agent is hovered or selected.
+     */
+    agentMode?: 'always' | 'hover';
+    /** Same as `agentMode`, for interactive object labels. */
+    objectMode?: 'always' | 'hover';
   };
 }
 

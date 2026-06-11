@@ -123,6 +123,8 @@ export interface FloorLabel {
   position: ScenePoint;
   size?: SceneSize;
   color?: string;
+  /** From the Tiled text object's `pixelsize`. */
+  fontSize?: number;
 }
 
 /** Events the scene emits towards the host application. */

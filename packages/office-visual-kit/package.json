@@ -1,6 +1,7 @@
 {
   "name": "@trading-office/office-visual-kit",
   "version": "0.1.0",
+  "license": "MIT",
   "private": true,
   "type": "module",
   "description": "Office Visual Builder Kit — Tiled map → scene schema → PixiJS renderer → React wrapper",

@@ -176,6 +176,7 @@ export function resolveSceneEntities(
           ? { width: obj.width, height: obj.height }
           : undefined,
       color: obj.text?.color,
+      fontSize: obj.text?.pixelsize,
     });
   }
 

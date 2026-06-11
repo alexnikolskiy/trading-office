@@ -21,13 +21,40 @@ the rest.
 
 - **Environment/props/agents**: edit
   `examples/trading-lab-research-floor/tools/lib/palette.mjs` (one file owns
-  every color), then `npm run generate:assets`.
+  every color), then `npm run generate:assets`. Draw in the day palette —
+  the night tileset is derived by `nightify()`. Colors listed in `EMISSIVE`
+  (screens, LEDs, lamp light) keep glowing at night.
 - **UI accents (hover, selection, badges, labels, ambient)**: edit the
   `theme` block of the scene config — see `statusColors`, `hoverColor`,
-  `selectionColor`, `ambientOverlayColor/Alpha`.
-- Keep the night mood: dark desaturated surfaces, one bright accent per
-  meaning (cyan = activity, amber = review/warning, red = failure,
-  violet/gold = Boss).
+  `selectionColor`, `ambientOverlayColor/Alpha`, `statusBadgeScale`.
+- One bright accent per meaning: cyan = activity, amber = review/warning,
+  red = failure, violet/gold = Boss.
+
+## Switch / add a theme (Day Office ↔ Night Control Room)
+
+The example ships two themes sharing one geometry. Each theme is:
+
+1. a generated tileset image (`office-tileset-<theme>.png`);
+2. a generated map (`trading-lab-research-floor-<theme>.tmj`) that differs
+   only in tileset image, background color and floor-label color;
+3. a `Partial<OfficeSceneTheme>` block in
+   `src/scene/tradingLabResearchFloor.scene.ts` (`FLOOR_THEMES`).
+
+The preview toggle simply swaps the scene config (`key` remounts the canvas).
+To add a third theme: add an entry to `THEMES` in `tools/lib/tiles.mjs` with
+its own post-process (or palette), add it to `THEME_COLORS` in
+`generate-map.mjs`, add a `FLOOR_THEMES` entry, regenerate. No kit changes —
+themes are entirely data.
+
+## Labels that don't cover furniture
+
+- `labels.agentMode` / `labels.objectMode` in the scene config: `'always'`
+  (default) or `'hover'` — the example keeps agent chips always-on and shows
+  object labels only on hover.
+- Chip font size lives in `theme.agentLabel.fontSize` /
+  `theme.objectLabel.fontSize`; `theme.statusBadgeScale` scales the status
+  pills for larger tile sizes.
+- Per-entity opt-out: `showLabel: false` on any agent/object entry.
 
 ## Replace an asset with better art
 
@@ -71,9 +98,12 @@ Nothing else changes — entity code references assets only by key.
 ## Density / noise control
 
 - Fewer-but-larger props read better than many small ones.
-- The tile seams and floor noise live in `tools/lib/tiles.mjs`
-  (`noiseFloor`, the `floorSeam` color) — soften them there if the grid feels
-  heavy at your target zoom.
+- The plank seams and floor grain live in `tools/lib/tiles.mjs`
+  (`plankFloor`, the `floorSeam`/`plank` colors) — soften them there if the
+  grid feels heavy at your target zoom.
+- Workstation rugs are 9-slice zones (`rugZone()` in `generate-map.mjs`) —
+  resize or recolor them (`rug*` / `brug*` palette entries) instead of adding
+  ad-hoc floor rectangles.
 - `labels.floor: false` hides zone text; `statusBadgeText: false` switches
   badges to dot-only — both reduce visual noise instantly.
 

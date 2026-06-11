@@ -30,14 +30,15 @@ npm run dev
 ```
 
 Open http://localhost:5173 — you should see the pixel-art Trading Lab Research
-Floor. Drag to pan, scroll to zoom, hover/click agents and objects to inspect
-them in the debug card.
+Floor in the **Day Office** theme (toggle to **Night Control Room** in the
+topbar). Drag to pan, scroll to zoom, hover/click agents and objects to
+inspect them in the debug card.
 
 Other commands:
 
 ```bash
 npm run build      # typecheck + build kit and example
-npm run generate   # regenerate placeholder pixel assets + the Tiled map
+npm run generate   # regenerate placeholder pixel assets + the Tiled maps
 ```
 
 ## Visual style & licensing
@@ -49,7 +50,9 @@ Prototype environment assets may later include Kenney CC0 assets. Reference
 screenshots were used only as private mood references and were not copied into
 the final layout, characters, or assets.
 
-See `packages/office-visual-kit/docs/asset-guidelines.md` for the full policy.
+Code and generated assets are licensed under MIT — see `LICENSE`.
+See `packages/office-visual-kit/docs/asset-guidelines.md` for the full asset
+policy.
 
 ## What is intentionally NOT here (Phase 0)
 

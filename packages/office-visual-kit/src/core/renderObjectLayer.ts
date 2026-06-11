@@ -21,12 +21,19 @@ export class ObjectView implements EntityView {
   private readonly width: number;
   private readonly height: number;
 
+  private readonly labelMode: 'always' | 'hover';
+
   constructor(
     readonly entity: ObjectEntity,
     private readonly theme: OfficeSceneTheme,
     registry: AssetRegistry,
-    options: { spriteKey?: string; showLabel: boolean },
+    options: {
+      spriteKey?: string;
+      showLabel: boolean;
+      labelMode?: 'always' | 'hover';
+    },
   ) {
+    this.labelMode = options.labelMode ?? 'always';
     this.container = new Container();
     this.container.label = `object:${entity.id}`;
     this.container.position.set(entity.position.x, entity.position.y);
@@ -72,6 +79,7 @@ export class ObjectView implements EntityView {
     if (options.showLabel && entity.label) {
       this.labelChip = createLabelChip(entity.label, theme.objectLabel);
       this.labelChip.container.position.set(Math.round(width / 2), height + 2);
+      this.labelChip.container.visible = this.labelMode === 'always';
       this.container.addChild(this.labelChip.container);
     } else {
       this.labelChip = null;
@@ -90,9 +98,14 @@ export class ObjectView implements EntityView {
 
   private refreshOutline(): void {
     const active = this.hovered || this.selected;
-    this.outline.visible = active;
-    if (!active) return;
     const color = this.selected ? this.theme.selectionColor : this.theme.hoverColor;
+    this.outline.visible = active;
+    if (this.labelChip) {
+      // Always reset the chip, including when hover/selection ends.
+      this.labelChip.setHighlighted(active, color);
+      this.labelChip.container.visible = this.labelMode === 'always' || active;
+    }
+    if (!active) return;
     this.outline.clear();
     this.outline
       .roundRect(-1.5, -1.5, this.width + 3, this.height + 3, 2)
@@ -100,7 +113,6 @@ export class ObjectView implements EntityView {
     this.outline
       .roundRect(-3, -3, this.width + 6, this.height + 6, 3)
       .stroke({ color, width: 0.75, alpha: 0.3 });
-    this.labelChip?.setHighlighted(active, color);
   }
 
   destroy(): void {
@@ -112,7 +124,11 @@ export function renderObject(
   entity: ObjectEntity,
   theme: OfficeSceneTheme,
   registry: AssetRegistry,
-  options: { spriteKey?: string; showLabel: boolean },
+  options: {
+    spriteKey?: string;
+    showLabel: boolean;
+    labelMode?: 'always' | 'hover';
+  },
 ): ObjectView {
   return new ObjectView(entity, theme, registry, options);
 }

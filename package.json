@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "AI Office Shell / Control Room — Phase 0: Office Visual Builder Kit",
+  "license": "MIT",
   "workspaces": [
     "packages/*",
     "examples/*"

@@ -28,9 +28,20 @@ interface OfficeSceneConfig {
   agents: AgentSceneConfig[];
   objects: ObjectSceneConfig[];
   camera?: SceneCameraConfig;
-  labels?: { agents?: boolean; objects?: boolean; floor?: boolean };
+  labels?: {
+    agents?: boolean;            // master switches
+    objects?: boolean;
+    floor?: boolean;
+    agentMode?: 'always' | 'hover';   // 'hover' shows chips only on hover/selection
+    objectMode?: 'always' | 'hover';
+  };
 }
 ```
+
+A "theme" of a floor (like the example's Day Office / Night Control Room) is
+just a different `OfficeSceneConfig`: same agents/objects, a different map
+URL (same geometry, different tileset image) and a different `theme` block.
+Switching is a config swap — no schema or kit changes involved.
 
 ### SpriteAssetConfig
 
@@ -38,7 +49,7 @@ interface OfficeSceneConfig {
 {
   key: 'agent:researcher',   // referenced by agents/objects
   url: '/assets/agents/agent-researcher.png',
-  frameWidth: 16,            // horizontal strip slicing
+  frameWidth: 32,            // horizontal strip slicing
   frameCount: 2,             // 1 = static sprite
   animationSpeed: 0.02,      // PIXI.AnimatedSprite speed
 }
@@ -98,18 +109,22 @@ Status → badge color mapping lives in the theme (`statusColors`), defaults in
 
 ```ts
 {
-  backgroundColor: '#0b0e1a',
-  ambientOverlayColor: '#2b2350',  // night tint over the whole scene
-  ambientOverlayAlpha: 0.08,       // 0 disables
-  hoverColor: '#7ef7ff',
-  selectionColor: '#ffd166',
-  floorLabelColor: '#54648c',
+  backgroundColor: '#6f7886',
+  ambientOverlayColor: '#ffd9a0',  // scene-wide tint (warm sun / night violet)
+  ambientOverlayAlpha: 0.04,       // 0 disables
+  hoverColor: '#0a84ff',
+  selectionColor: '#e8590c',
+  floorLabelColor: '#7a6850',
   statusColors: { running: '#59f7d4', /* … */ },
   statusBadgeText: true,           // false → dot-only badges
+  statusBadgeScale: 1.4,           // badge size relative to the world (1 = 16px-tile sizing)
   agentLabel: { color, backgroundColor, backgroundAlpha, fontSize },
   objectLabel: { /* same shape */ },
 }
 ```
+
+The kit's `DEFAULT_THEME` is the night control-room look; the example's Day
+Office overrides it via `FLOOR_THEMES` in its scene module.
 
 ### Camera
 

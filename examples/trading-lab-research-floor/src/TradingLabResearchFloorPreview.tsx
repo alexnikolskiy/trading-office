@@ -6,12 +6,16 @@ import type {
 import { OfficeSceneCanvas } from '@trading-office/office-visual-kit/react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DebugCard } from './DebugCard';
-import { createTradingLabResearchFloorScene } from './scene/tradingLabResearchFloor.scene';
+import {
+  createTradingLabResearchFloorScene,
+  FLOOR_THEMES,
+  type FloorThemeName,
+} from './scene/tradingLabResearchFloor.scene';
 
 /**
  * Preview shell for the Trading Lab Research Floor. The React layer is a thin
- * wrapper: canvas + debug overlay + a status simulation toggle. All rendering
- * happens inside the kit's PixiJS core.
+ * wrapper: canvas + debug overlay + preview-only toggles (theme, status
+ * simulation). All rendering happens inside the kit's PixiJS core.
  */
 
 /** Plausible status loops per agent — preview-side only, no real API. */
@@ -25,20 +29,34 @@ const STATUS_POOLS: Record<string, AgentStatus[]> = {
   'perf-monitor': ['idle', 'running', 'failed', 'running'],
 };
 
+const THEME_ORDER: FloorThemeName[] = ['day', 'night'];
+
 export function TradingLabResearchFloorPreview() {
-  const config = useMemo(() => createTradingLabResearchFloorScene(), []);
+  const [themeName, setThemeName] = useState<FloorThemeName>('day');
+  const config = useMemo(
+    () => createTradingLabResearchFloorScene(themeName),
+    [themeName],
+  );
   const sceneRef = useRef<OfficeScene | null>(null);
 
   const [hovered, setHovered] = useState<OfficeEntity | null>(null);
   const [selected, setSelected] = useState<OfficeEntity | null>(null);
-  const [simulate, setSimulate] = useState(true);
+  const [simulate, setSimulate] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
   const handleSceneReady = useCallback((scene: OfficeScene) => {
     sceneRef.current = scene;
   }, []);
 
-  // Lightweight "the office is alive" status simulation.
+  const switchTheme = useCallback((next: FloorThemeName) => {
+    sceneRef.current = null;
+    setHovered(null);
+    setSelected(null);
+    setError(null);
+    setThemeName(next);
+  }, []);
+
+  // Lightweight "the office is alive" status simulation (off by default).
   useEffect(() => {
     if (!simulate) return;
     let tick = 0;
@@ -72,18 +90,35 @@ export function TradingLabResearchFloorPreview() {
             office-visual-kit preview · Tiled map → scene config → PixiJS → React
           </p>
         </div>
-        <label className="sim-toggle">
-          <input
-            type="checkbox"
-            checked={simulate}
-            onChange={(event) => setSimulate(event.target.checked)}
-          />
-          simulate agent activity
-        </label>
+        <div className="topbar-controls">
+          <div className="theme-toggle" role="group" aria-label="Scene theme">
+            {THEME_ORDER.map((name) => (
+              <button
+                key={name}
+                type="button"
+                className="theme-btn"
+                data-active={name === themeName}
+                onClick={() => switchTheme(name)}
+              >
+                {name === 'day' ? '☀ ' : '☾ '}
+                {FLOOR_THEMES[name].label}
+              </button>
+            ))}
+          </div>
+          <label className="sim-toggle">
+            <input
+              type="checkbox"
+              checked={simulate}
+              onChange={(event) => setSimulate(event.target.checked)}
+            />
+            simulate agent activity
+          </label>
+        </div>
       </header>
 
       <main className="stage">
         <OfficeSceneCanvas
+          key={themeName}
           config={config}
           onSceneReady={handleSceneReady}
           onSceneError={setError}

@@ -151,6 +151,8 @@ export class OfficeScene extends EventEmitter<OfficeSceneEventMap> {
     const badgeRenderer = new StatusBadgeRenderer(theme);
     const showAgentLabels = config.labels?.agents !== false;
     const showObjectLabels = config.labels?.objects !== false;
+    const agentLabelMode = config.labels?.agentMode ?? 'always';
+    const objectLabelMode = config.labels?.objectMode ?? 'always';
 
     const agentConfigById = new Map(config.agents.map((a) => [a.id, a]));
     for (const agent of entities.agents) {
@@ -159,6 +161,7 @@ export class OfficeScene extends EventEmitter<OfficeSceneEventMap> {
       const view = new AgentView(agent, theme, registry, badgeRenderer, {
         spriteKey,
         showLabel: showAgentLabels && agentConfigById.get(agent.id)?.showLabel !== false,
+        labelMode: agentLabelMode,
       });
       scene.agentViews.set(agent.id, view);
       scene.interaction.attach(view);
@@ -171,6 +174,7 @@ export class OfficeScene extends EventEmitter<OfficeSceneEventMap> {
       const view = new ObjectView(object, theme, registry, {
         spriteKey: objectConfig?.sprite,
         showLabel: showObjectLabels && objectConfig?.showLabel !== false,
+        labelMode: objectLabelMode,
       });
       scene.objectViews.set(object.id, view);
       if (object.interactive) {
@@ -207,7 +211,7 @@ export class OfficeScene extends EventEmitter<OfficeSceneEventMap> {
         text: label.text,
         style: new TextStyle({
           fontFamily: '"Courier New", ui-monospace, Menlo, monospace',
-          fontSize: 8,
+          fontSize: label.fontSize ?? 8,
           fontWeight: '700',
           letterSpacing: 2,
           fill: label.color ?? theme.floorLabelColor,
@@ -280,13 +284,22 @@ export class OfficeScene extends EventEmitter<OfficeSceneEventMap> {
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
-    this.app.renderer.off('resize', this.onRendererResize);
+    // The host may have torn down the PIXI Application before this runs
+    // (React unmount order on theme switches) — guard every Pixi resource.
+    (this.app.renderer as typeof this.app.renderer | null)?.off(
+      'resize',
+      this.onRendererResize,
+    );
     this.interaction.destroy();
-    for (const view of this.agentViews.values()) view.destroy();
-    for (const view of this.objectViews.values()) view.destroy();
+    for (const view of this.agentViews.values()) {
+      if (!view.container.destroyed) view.destroy();
+    }
+    for (const view of this.objectViews.values()) {
+      if (!view.container.destroyed) view.destroy();
+    }
     this.agentViews.clear();
     this.objectViews.clear();
-    this.camera.destroy();
+    if (!this.camera.viewport.destroyed) this.camera.destroy();
     this.registry.destroy();
     this.removeAllListeners();
   }

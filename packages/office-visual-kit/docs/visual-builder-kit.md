@@ -55,7 +55,7 @@ const config: OfficeSceneConfig = {
   title: 'My Floor',
   map: { url: '/maps/my-floor.tmj' },
   assets: [
-    { key: 'agent:researcher', url: '/assets/agents/agent-researcher.png', frameWidth: 16, frameCount: 2 },
+    { key: 'agent:researcher', url: '/assets/agents/agent-researcher.png', frameWidth: 32, frameCount: 2 },
   ],
   agents: [{ id: 'alice', role: 'researcher', displayName: 'Alice' }],
   objects: [],

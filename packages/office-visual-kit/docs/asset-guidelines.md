@@ -21,10 +21,16 @@ directory:
 
 | Script / module | Output |
 | --- | --- |
-| `tools/lib/tiles.mjs` | `tiles/office-tileset.png` — 26 environment/furniture tiles, 16×16 |
-| `tools/lib/agents.mjs` | `agents/agent-<role>.png` — 16×24 characters, 2 idle frames |
+| `tools/lib/tiles.mjs` | `tiles/office-tileset-day.png` + `-night.png` — 51 environment/furniture tiles, 32×32 |
+| `tools/lib/agents.mjs` | `agents/agent-<role>.png` — 32×40 characters (seated in an office chair, Boss standing), 2 idle frames |
 | `tools/lib/props.mjs` | `props/*.png` — interactive objects, 2 animation frames |
-| `tools/lib/palette.mjs` | the "Retro Pixel AI Research Tower" night palette |
+| `tools/lib/palette.mjs` | the "Retro Pixel AI Research Tower" day palette + `nightify()` + `EMISSIVE` |
+
+All art is drawn once in the Day Office palette. The night tileset is derived
+automatically: `nightify()` pushes every pixel toward a dark blue cast except
+the `EMISSIVE` colors (screen accents, LEDs, lamp light), which keep glowing;
+tiles that need true night art (windows) opt in with a `themed` draw
+function. Adding a tile once therefore gives you both themes.
 
 Regenerate with `npm run generate` (deterministic — committed PNGs reproduce
 byte-for-byte). These assets are original work created for this repository

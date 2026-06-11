@@ -1,7 +1,8 @@
 # Trading Lab — Research Floor (preview)
 
 Example floor for the Office Visual Builder Kit: the `trading-lab` multi-agent
-research system rendered as a pixel-art night office.
+research system rendered as a pixel-art office. Two themes share one floor:
+**Day Office** (default) and **Night Control Room** — toggle in the topbar.
 
 ## Run
 
@@ -12,8 +13,9 @@ npm run dev          # → http://localhost:5173
 ```
 
 Controls: drag to pan, wheel to zoom, hover to inspect, click to pin an entity
-in the debug card, click empty floor to clear. The "simulate agent activity"
-toggle cycles plausible agent statuses (preview-side only — no real API).
+in the debug card, click empty floor to clear. The topbar has the Day/Night
+theme toggle; the "simulate agent activity" checkbox (off by default) cycles
+plausible agent statuses (preview-side only — no real API).
 
 ## What's on the floor
 
@@ -29,15 +31,16 @@ Table.
 ```text
 src/
   main.tsx                                  entry (no StrictMode — see comment)
-  TradingLabResearchFloorPreview.tsx        preview shell + status simulation
+  TradingLabResearchFloorPreview.tsx        preview shell + theme toggle + simulation
   DebugCard.tsx                             hover/click debug overlay
-  scene/tradingLabResearchFloor.scene.ts    semantic scene config
+  scene/tradingLabResearchFloor.scene.ts    semantic scene config (FLOOR_THEMES)
 public/
-  maps/trading-lab-research-floor.tmj       Tiled-compatible map (generated)
+  maps/trading-lab-research-floor-day.tmj   Tiled-compatible maps (generated;
+  maps/trading-lab-research-floor-night.tmj  same geometry, per-theme tileset)
   assets/generated/                         original pixel assets (generated)
 tools/
   generate-assets.mjs                       renders all PNGs (zero deps)
-  generate-map.mjs                          builds the .tmj
+  generate-map.mjs                          builds both .tmj variants
   lib/                                      palette, tiles, agents, props, png encoder
 ```
 

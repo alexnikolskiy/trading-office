@@ -13,7 +13,7 @@ import { AGENT_ROLES, drawAgentFrames } from './lib/agents.mjs';
 import { strip } from './lib/img.mjs';
 import { encodePng } from './lib/png.mjs';
 import { PROP_DEFS } from './lib/props.mjs';
-import { renderTileset, TILE_DEFS, TILESET_COLUMNS, TILE_SIZE } from './lib/tiles.mjs';
+import { renderTileset, THEMES, TILE_DEFS, TILESET_COLUMNS, TILE_SIZE } from './lib/tiles.mjs';
 
 const exampleRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const outRoot = join(exampleRoot, 'public', 'assets', 'generated');
@@ -23,17 +23,18 @@ function writePng(relPath, img) {
   mkdirSync(dirname(file), { recursive: true });
   writeFileSync(file, encodePng(img.width, img.height, img.data));
   console.log(
-    `  ${relPath.padEnd(36)} ${String(img.width).padStart(3)}×${img.height}`,
+    `  ${relPath.padEnd(40)} ${String(img.width).padStart(3)}×${img.height}`,
   );
 }
 
 console.log('Generating placeholder pixel assets…');
 
-// 1. Environment / furniture tileset
-const tileset = renderTileset();
-writePng(join('tiles', 'office-tileset.png'), tileset);
+// 1. Environment / furniture tilesets (Day Office + Night Control Room)
+for (const theme of THEMES) {
+  writePng(join('tiles', `office-tileset-${theme}.png`), renderTileset(theme));
+}
 console.log(
-  `  tileset: ${TILE_DEFS.length} tiles, ${TILESET_COLUMNS} columns, tile ${TILE_SIZE}px`,
+  `  tileset: ${TILE_DEFS.length} tiles, ${TILESET_COLUMNS} columns, tile ${TILE_SIZE}px, themes: ${THEMES.join(', ')}`,
 );
 
 // 2. Agents (2-frame idle strips)

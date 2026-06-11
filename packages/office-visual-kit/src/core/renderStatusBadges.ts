@@ -29,6 +29,7 @@ export class StatusBadgeRenderer {
 
   create(initial: AgentStatus): StatusBadge {
     const showText = this.theme.statusBadgeText !== false;
+    const scale = this.theme.statusBadgeScale ?? 1;
     const container = new Container();
     container.label = 'status-badge';
 
@@ -42,10 +43,10 @@ export class StatusBadgeRenderer {
         text: '',
         style: new TextStyle({
           fontFamily: BADGE_FONT,
-          fontSize: 6,
+          fontSize: 6 * scale,
           fontWeight: '700',
           fill: '#ffffff',
-          letterSpacing: 0.5,
+          letterSpacing: 0.5 * scale,
         }),
         resolution: 4,
       });
@@ -57,17 +58,17 @@ export class StatusBadgeRenderer {
 
     function redraw(status: AgentStatus): void {
       const color = renderer.colorFor(status);
-      const dotRadius = 2;
-      const padX = 3;
-      const height = 9;
+      const dotRadius = 2 * scale;
+      const padX = 3 * scale;
+      const height = 9 * scale;
 
       if (text) text.text = status;
       const textWidth = text ? Math.ceil(text.width) : 0;
-      const width = padX + dotRadius * 2 + (text ? 3 + textWidth : 0) + padX;
+      const width = padX + dotRadius * 2 + (text ? 3 * scale + textWidth : 0) + padX;
 
       background.clear();
       background
-        .roundRect(0, 0, width, height, 3)
+        .roundRect(0, 0, width, height, 3 * scale)
         .fill({ color: '#10131f', alpha: 0.78 })
         .stroke({ color, width: 0.75, alpha: 0.65 });
 
@@ -79,7 +80,10 @@ export class StatusBadgeRenderer {
         .stroke({ color, width: 0.75, alpha: 0.35 });
 
       if (text) {
-        text.position.set(padX + dotRadius * 2 + 3, (height - text.height) / 2);
+        text.position.set(
+          padX + dotRadius * 2 + 3 * scale,
+          (height - text.height) / 2,
+        );
       }
       container.pivot.set(width / 2, height);
     }

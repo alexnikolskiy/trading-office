@@ -19,14 +19,18 @@ export class AgentView implements EntityView {
   private hovered = false;
   private selected = false;
   private readonly spriteHeight: number;
+  private readonly spriteWidth: number;
+
+  private readonly labelMode: 'always' | 'hover';
 
   constructor(
     readonly entity: AgentEntity,
     private readonly theme: OfficeSceneTheme,
     registry: AssetRegistry,
     badgeRenderer: StatusBadgeRenderer,
-    options: { spriteKey: string; showLabel: boolean },
+    options: { spriteKey: string; showLabel: boolean; labelMode?: 'always' | 'hover' },
   ) {
+    this.labelMode = options.labelMode ?? 'always';
     this.container = new Container();
     this.container.label = `agent:${entity.id}`;
     this.container.position.set(entity.position.x, entity.position.y);
@@ -53,6 +57,7 @@ export class AgentView implements EntityView {
     sprite.anchor.set(0.5, 1);
     sprite.roundPixels = true;
     this.spriteHeight = sprite.height;
+    this.spriteWidth = sprite.width;
     this.container.addChild(sprite);
 
     this.badge = badgeRenderer.create(entity.status);
@@ -61,7 +66,8 @@ export class AgentView implements EntityView {
 
     if (options.showLabel) {
       this.labelChip = createLabelChip(entity.label, theme.agentLabel);
-      this.labelChip.container.position.set(0, 2);
+      this.labelChip.container.position.set(0, 3);
+      this.labelChip.container.visible = this.labelMode === 'always';
       this.container.addChild(this.labelChip.container);
     } else {
       this.labelChip = null;
@@ -85,13 +91,22 @@ export class AgentView implements EntityView {
 
   private refreshRing(): void {
     const active = this.hovered || this.selected;
-    this.ring.visible = active;
-    if (!active) return;
     const color = this.selected ? this.theme.selectionColor : this.theme.hoverColor;
+    this.ring.visible = active;
+    if (this.labelChip) {
+      // Always reset the chip, including when hover/selection ends.
+      this.labelChip.setHighlighted(active, color);
+      this.labelChip.container.visible = this.labelMode === 'always' || active;
+    }
+    if (!active) return;
+    // Feet ellipse sized to the sprite so it works for any tile scale.
+    const rx = Math.max(9, this.spriteWidth * 0.55);
+    const ry = rx * 0.45;
     this.ring.clear();
-    this.ring.ellipse(0, -1, 9, 4).stroke({ color, width: 1, alpha: 0.95 });
-    this.ring.ellipse(0, -1, 11, 5.5).stroke({ color, width: 0.75, alpha: 0.35 });
-    this.labelChip?.setHighlighted(active, color);
+    this.ring.ellipse(0, -1, rx, ry).stroke({ color, width: 1, alpha: 0.95 });
+    this.ring
+      .ellipse(0, -1, rx + 2, ry + 1.5)
+      .stroke({ color, width: 0.75, alpha: 0.35 });
   }
 
   destroy(): void {
@@ -105,7 +120,7 @@ export function renderAgent(
   theme: OfficeSceneTheme,
   registry: AssetRegistry,
   badgeRenderer: StatusBadgeRenderer,
-  options: { spriteKey: string; showLabel: boolean },
+  options: { spriteKey: string; showLabel: boolean; labelMode?: 'always' | 'hover' },
 ): AgentView {
   return new AgentView(entity, theme, registry, badgeRenderer, options);
 }
