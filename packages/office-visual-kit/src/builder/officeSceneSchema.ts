@@ -1,0 +1,175 @@
+import type {
+  AgentRole,
+  AgentStatus,
+  InteractiveObjectType,
+} from '../core/sceneTypes';
+
+/**
+ * The semantic scene schema.
+ *
+ * Split of responsibilities (see docs/scene-schema.md):
+ * - The Tiled map owns geometry: tiles, walls, furniture, positions of spawn
+ *   points and interactive object rectangles.
+ * - The scene config (this schema) owns semantics: which agent lives on which
+ *   spawn point, roles, labels, sprites, panel targets, theme, camera.
+ * - Runtime state (statuses, metrics, live data) will later come from the
+ *   office gateway; Phase 0 only exposes `setAgentStatus()` on the scene.
+ */
+
+export interface OfficeSceneThemeLabelStyle {
+  /** CSS color of label text. */
+  color: string;
+  /** CSS color of the chip behind the label. */
+  backgroundColor: string;
+  backgroundAlpha: number;
+  fontSize: number;
+}
+
+export interface OfficeSceneTheme {
+  name?: string;
+  /** Canvas clear color behind the map. */
+  backgroundColor: string;
+  /** Color of a subtle full-scene tint overlay ("night light"). */
+  ambientOverlayColor?: string;
+  /** 0..1 — set to 0 to disable the ambient overlay. */
+  ambientOverlayAlpha?: number;
+  /** Highlight color for hovered entities. */
+  hoverColor: string;
+  /** Highlight color for the selected entity. */
+  selectionColor: string;
+  /** Color of decorative floor labels from the `labels` Tiled layer. */
+  floorLabelColor: string;
+  statusColors?: Partial<Record<AgentStatus, string>>;
+  /** Render short status text next to the badge dot. */
+  statusBadgeText?: boolean;
+  agentLabel?: Partial<OfficeSceneThemeLabelStyle>;
+  objectLabel?: Partial<OfficeSceneThemeLabelStyle>;
+}
+
+/**
+ * One loadable sprite (or sprite strip) in the asset registry.
+ * Strips are horizontal: `frameCount` frames of `frameWidth` px each.
+ */
+export interface SpriteAssetConfig {
+  key: string;
+  url: string;
+  /** Defaults to image width / frameCount. */
+  frameWidth?: number;
+  /** Defaults to 1 (static sprite). */
+  frameCount?: number;
+  /** PIXI.AnimatedSprite speed; sensible idle default applied if omitted. */
+  animationSpeed?: number;
+}
+
+export interface AgentSceneConfig {
+  id: string;
+  role: AgentRole;
+  displayName: string;
+  /** Short label under the sprite; defaults to displayName. */
+  label?: string;
+  /** Name of the spawn-point object in Tiled; defaults to `id`. */
+  spawnPoint?: string;
+  initialStatus?: AgentStatus;
+  /** Asset key override; defaults to `agent:<role>`. */
+  sprite?: string;
+  showLabel?: boolean;
+}
+
+export interface ObjectSceneConfig {
+  id: string;
+  type: InteractiveObjectType;
+  /** Human label; defaults to `id`. */
+  label?: string;
+  /** Name of the rectangle object in Tiled; defaults to `id`. */
+  mapObjectName?: string;
+  /** Future React panel identifier, carried through to events. */
+  panelTarget?: string;
+  /**
+   * Asset key of the object sprite. When omitted the object becomes an
+   * invisible hit-area over furniture painted in tile layers.
+   */
+  sprite?: string;
+  /** Set false for purely decorative sprites (no hover/click). */
+  interactive?: boolean;
+  showLabel?: boolean;
+}
+
+export interface SceneCameraConfig {
+  /** 'fit' (default) frames the whole floor; a number is a fixed zoom. */
+  defaultZoom?: number | 'fit';
+  /** Screen-space padding used by fit, px. */
+  fitPadding?: number;
+  minZoom?: number;
+  maxZoom?: number;
+  enablePan?: boolean;
+  enableZoom?: boolean;
+}
+
+export interface OfficeSceneConfig {
+  id: string;
+  title: string;
+  map: {
+    /** URL of the Tiled JSON map (.tmj). */
+    url: string;
+  };
+  theme?: Partial<OfficeSceneTheme>;
+  assets: SpriteAssetConfig[];
+  agents: AgentSceneConfig[];
+  objects: ObjectSceneConfig[];
+  camera?: SceneCameraConfig;
+  labels?: {
+    /** Show labels under agents (default true). */
+    agents?: boolean;
+    /** Show labels on interactive objects (default true). */
+    objects?: boolean;
+    /** Show decorative floor labels from the map (default true). */
+    floor?: boolean;
+  };
+}
+
+export const DEFAULT_STATUS_COLORS: Record<AgentStatus, string> = {
+  idle: '#8a93a8',
+  thinking: '#a06bff',
+  running: '#59f7d4',
+  waiting: '#5a78b8',
+  reviewing: '#ffb454',
+  backtesting: '#4f9cff',
+  success: '#69e85e',
+  failed: '#ff5d5d',
+  blocked: '#ff8a3d',
+};
+
+export const DEFAULT_THEME: OfficeSceneTheme = {
+  name: 'retro-pixel-research-tower-night',
+  backgroundColor: '#0b0e1a',
+  ambientOverlayColor: '#2b2350',
+  ambientOverlayAlpha: 0.08,
+  hoverColor: '#7ef7ff',
+  selectionColor: '#ffd166',
+  floorLabelColor: '#54648c',
+  statusColors: DEFAULT_STATUS_COLORS,
+  statusBadgeText: true,
+  agentLabel: {
+    color: '#d4dcf0',
+    backgroundColor: '#10131f',
+    backgroundAlpha: 0.65,
+    fontSize: 7,
+  },
+  objectLabel: {
+    color: '#9fb2d8',
+    backgroundColor: '#10131f',
+    backgroundAlpha: 0.65,
+    fontSize: 7,
+  },
+};
+
+/** Merge a partial theme over the default theme. */
+export function resolveTheme(theme?: Partial<OfficeSceneTheme>): OfficeSceneTheme {
+  return {
+    ...DEFAULT_THEME,
+    ...theme,
+    statusColors: { ...DEFAULT_STATUS_COLORS, ...theme?.statusColors },
+    agentLabel: { ...DEFAULT_THEME.agentLabel, ...theme?.agentLabel },
+    objectLabel: { ...DEFAULT_THEME.objectLabel, ...theme?.objectLabel },
+  };
+}
