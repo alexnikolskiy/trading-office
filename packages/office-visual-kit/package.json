@@ -1,0 +1,48 @@
+{
+  "name": "@trading-office/office-visual-kit",
+  "version": "0.1.0",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "description": "Office Visual Builder Kit — Tiled map → scene schema → PixiJS renderer → React wrapper",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./react": {
+      "types": "./src/react/index.ts",
+      "default": "./src/react/index.ts"
+    }
+  },
+  "files": [
+    "src",
+    "docs"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "@pixi/react": "^8.0.0",
+    "pixi-viewport": "^6.0.3",
+    "pixi.js": "^8.6.0",
+    "react": "^19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@pixi/react": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@pixi/react": "^8.0.0",
+    "@types/react": "^19.1.0",
+    "pixi-viewport": "^6.0.3",
+    "pixi.js": "^8.6.0",
+    "react": "^19.1.0",
+    "typescript": "^5.8.3"
+  }
+}

@@ -1,0 +1,157 @@
+# Visual Tuning Guide
+
+How to iterate on the look of a floor after visual feedback — without
+touching the renderer.
+
+## Move a desk / agent / object
+
+Positions are geometry → they live in the map.
+
+- **Generated example map**: edit
+  `examples/trading-lab-research-floor/tools/generate-map.mjs` (desk
+  coordinates, spawn points, object rects are plain numbers there), then
+  `npm run generate:map`. Vite picks the new map up on reload.
+- **Hand-authored map**: open the `.tmj` in Tiled, drag things, re-export.
+
+Agents are anchored at the feet and face the viewer. A workstation is a
+2×1 desk block (`desk_<variant>_l/r` tiles: desk surface + an aluminum
+monitor whose screen faces the agent — its back, with a glowing mark, is
+toward the camera) plus a front-facing seated agent bust whose spawn point
+sits **exactly on the desk block's top edge** — the desk and monitor then
+cover the agent's lap and the scene reads as "agent works at a computer"
+while the face, hair and outfit stay visible. The nameplate chip is pushed
+**below the desk block** via `theme.agentLabelOffsetY` (the example uses `30`
+on 32px tiles, so the plate reads as a floor nameplate in front of the
+workstation); an agent behind a deeper desk (the Boss's 4×2 console)
+overrides it per-agent with `labelOffsetY` in its `agents` entry. Keep at
+least one empty tile row
+between stacked workstations — the example uses a 4-row pitch so status
+badges never crowd the next agent's nameplate.
+
+## Change the palette
+
+- **Environment/props/agents**: edit
+  `examples/trading-lab-research-floor/tools/lib/palette.mjs` (one file owns
+  every color), then `npm run generate:assets`. Draw in the day palette —
+  the night tileset is derived by `nightify()`. Colors listed in `EMISSIVE`
+  (screens, LEDs, lamp light) keep glowing at night.
+- **UI accents (hover, selection, badges, labels, ambient)**: edit the
+  `theme` block of the scene config — see `statusColors`, `hoverColor`,
+  `selectionColor`, `ambientOverlayColor/Alpha`, `statusBadgeScale`.
+- One bright accent per meaning: cyan = activity, amber = review/warning,
+  red = failure, violet/gold = Boss.
+- `hoverColor` / `selectionColor` tint the agent selection indicator — a
+  translucent rectangle behind the character plus a breathing corner-bracket
+  reticle (hover = `hoverColor`, click/select = `selectionColor`).
+
+## Switch / add a theme (Day Office ↔ Night Control Room)
+
+The example ships two themes sharing one geometry. Each theme is:
+
+1. a generated tileset image (`office-tileset-<theme>.png`);
+2. a generated map (`trading-lab-research-floor-<theme>.tmj`) that differs
+   only in tileset image and background color;
+3. a `Partial<OfficeSceneTheme>` block in
+   `src/scene/tradingLabResearchFloor.scene.ts` (`FLOOR_THEMES`).
+
+The preview toggle simply swaps the scene config (`key` remounts the canvas).
+To add a third theme: add an entry to `THEMES` in `tools/lib/tiles.mjs` with
+its own post-process (or palette), add it to `THEME_COLORS` in
+`generate-map.mjs`, add a `FLOOR_THEMES` entry, regenerate. No kit changes —
+themes are entirely data.
+
+## Labels that don't cover furniture
+
+- `labels.agentMode` / `labels.objectMode` in the scene config: `'always'`
+  (default) or `'hover'` — the example keeps agent nameplates always-on and
+  shows object labels only on hover.
+- Agent chips render below the feet anchor; `theme.agentLabelOffsetY`
+  pushes them down **past the desk block** so they read as a **floor
+  nameplate in front of the workstation** (the example uses `30` with 32px
+  desk tiles). Style the plaque via `theme.agentLabel` — the example uses a
+  dark plate, light text, a brass `borderColor` and `fontSize: 10` so plates
+  stay legible and never blend into the floor; font size lives in
+  `agentLabel.fontSize` / `objectLabel.fontSize`.
+- `theme.statusBadgeScale` scales the status pills;
+  `theme.statusBadgeOffsetY` offsets the badge above the sprite top — a
+  **negative** value (the example uses `-8`) drops it down close to the head.
+  **Idle** agents (per `theme.agentIdleStatuses`, default `['idle']`) show no
+  badge at all; busy agents show a shimmering `<status>…` pill.
+  `statusBadgeText: false` switches badges to dot-only.
+- Per-entity opt-out: `showLabel: false` on any agent/object entry.
+- `labels.floor: false` (example default) — no decorative floor text; zones
+  read through layout and furniture instead.
+
+## Replace an asset with better art
+
+1. Draw a PNG with the same frame layout (horizontal strip) — or change
+   `frameWidth`/`frameCount` in the scene config's `assets` entry to match
+   the new file.
+2. Drop it under `public/assets/...` and point the asset `url` at it.
+3. If it's third-party, follow
+   [asset-guidelines.md](./asset-guidelines.md) (source + license files).
+
+Nothing else changes — entity code references assets only by key.
+
+## Add a new agent role
+
+1. Add a look to `LOOKS` in `tools/compose-lpc-agents.mjs` — pick LPC
+   layers with a `sit` sheet (body, legs, clothes, optional necktie /
+   glasses, head, eyes, hair) and palette ramps (`bodyRamp` + per-layer
+   cloth/hair/eye ramps); `executive: true` draws the winged command chair
+   behind the figure. Run `ULPC_DIR=<lpc checkout> npm run compose:lpc` —
+   the script writes `agent-<role>.png` AND regenerates ATTRIBUTIONS.md for
+   the new source sheets. Agents face the viewer: differentiate roles with
+   hair, outfit, colors and accessories.
+2. Register the sprite in the scene config `assets`. The composer emits a
+   4-frame strip, so declare its animation states:
+   `{ key: 'agent:<role>', url, frameWidth: 64, frameCount: 4, states: {`
+   `idle: { from: 0, count: 1 }, active: { from: 1, count: 3, speed: 0.14 } } }`
+   — idle pose + typing loop (see [scene-schema.md](./scene-schema.md)).
+3. Use the role in an `agents` entry. Custom role strings are allowed by the
+   schema; nothing in the kit needs patching.
+
+## Add a new interactive object type
+
+1. Draw or generate a prop (add a draw function to `tools/lib/props.mjs` and
+   it lands in `props/<name>.png` with 2 frames).
+2. Register `{ key: 'prop:<type>', url: ... }` in assets.
+3. Add a rect in the map's `interactive_objects` layer and an `objects` entry
+   with your `type` string. Types are an open union — `panelTarget` is what
+   the future app actually routes on.
+
+## Scale / fit / camera feel
+
+- `camera.fitPadding` — breathing room around the floor in the default view.
+- `camera.defaultZoom: 2` — fixed integer zoom for the crispest pixels
+  (non-integer fit zoom is slightly softer; both look fine with
+  nearest-neighbour).
+- `camera.minZoom/maxZoom` — how far users may stray.
+- Readability rule of thumb from the brief: the whole floor should read at
+  ~1280×720; labels and badges should stay legible at the default view.
+
+## Density / noise control
+
+- Fewer-but-larger props read better than many small ones; chunky 2× art
+  pixels (draw at logical 16, `upscale()` ×2) beat micro-detail.
+- The plank seams and floor grain live in `tools/lib/tiles.mjs`
+  (`plankFloor`, the `floorSeam`/`plank` colors) — soften them there if the
+  grid feels heavy at your target zoom.
+- The floor is ONE shared texture (Iteration 4 dropped the zone carpets):
+  furniture must contrast through its own colors (dark espresso desks,
+  aluminum monitors) — if you add a new floor texture, change it globally
+  rather than reintroducing per-zone patches.
+- Furniture follows office logic: cabinets/shelves against walls, break area
+  (vending + coffee + cooler + trash) along a wall, infra grouped in one
+  corner, plants in seams and corners — never random props in open floor.
+
+## Iteration loop after visual feedback
+
+```bash
+npm run generate   # re-render assets + map after edits in tools/
+npm run dev        # hot-reloads scene config and CSS edits live
+```
+
+Map and asset edits show up on the next browser reload; scene-config edits
+hot-reload through Vite. Screenshots at 1280×720 are the canonical review
+format.

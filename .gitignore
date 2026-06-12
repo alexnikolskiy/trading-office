@@ -1,0 +1,18 @@
+# dependencies / build
+node_modules/
+dist/
+*.tsbuildinfo
+
+# logs / OS noise
+*.log
+.DS_Store
+
+# local env
+.env
+.env.local
+
+# private mood references must never reach public git (see docs/fable-input/03-license-policy.md)
+docs/fable-input/references/*.png
+docs/fable-input/references/*.jpg
+docs/fable-input/references/*.jpeg
+docs/fable-input/references/*.webp
