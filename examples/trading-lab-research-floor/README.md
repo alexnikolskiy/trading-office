@@ -24,11 +24,14 @@ behind a deep mahogany command console), Strategy Analyst, Researcher,
 Critic/Risk Reviewer, Builder, Evaluator, Performance Monitor. Everyone
 faces the viewer, seated behind their desk with a slim aluminum monitor in
 front (screen toward the agent, glowing mark on its back); role labels are
-nameplate plaques on each desk's front edge. Characters are **composed from
+nameplate plaques below each desk. Characters are **composed from
 real Universal LPC Spritesheet Character Generator layers** (chair-sit
 pose, the generator's own palette ramps) — see
-`public/assets/third-party/lpc/` for SOURCE/ATTRIBUTIONS/LICENSES. Agents
-sit still — no idle animation.
+`public/assets/third-party/lpc/` for SOURCE/ATTRIBUTIONS/LICENSES. Each agent
+is a 4-frame status-driven strip — a still idle pose plus a hands-only typing
+loop — so idle agents sit still and busy ones type. Status badges sit above
+busy agents (idle agents show none) and shimmer; hovering or selecting an
+agent frames it with a highlight (only the character is clickable).
 
 Layout: one shared plank floor (no zone carpets — desks contrast through
 dark espresso wood + aluminum monitors); boards symmetric around the
@@ -36,11 +39,13 @@ centered door (Hypothesis left, Backtests right); vending machine + bin
 and bin + big water cooler stand flush against the wall flanking the
 entrance; the Boss sits screen-center, one row above a glass-walled infra
 room (square corners, sliding glass door) holding the Server Rack, Archive
-Shelf and Bot Status Monitor; a coffee corner sits by the bottom wall.
+Shelf and Bot Status Monitor; behind the Boss is an executive lounge — two
+leather sofas facing each other with a coffee table between them and framing
+plants; big plants fill the corner seams.
 
 Interactive objects: Hypothesis Board, Wall Monitor (backtests), Bot Status
-Monitor, Archive Shelf, Server Rack / Data Node, Boss Console (a hit-area
-over the console furniture tiles).
+Monitor, Archive Shelf, Server Rack / Data Node, and the entrance Door
+(`panelTarget: 'exit'`). The Boss console is furniture only — not clickable.
 
 ## Structure
 

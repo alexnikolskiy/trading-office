@@ -20,10 +20,11 @@ toward the camera) plus a front-facing seated agent bust whose spawn point
 sits **exactly on the desk block's top edge** — the desk and monitor then
 cover the agent's lap and the scene reads as "agent works at a computer"
 while the face, hair and outfit stay visible. The nameplate chip is pushed
-down onto the desk's front edge via `theme.agentLabelOffsetY` (set it to
-the desk-block height in px, minus a small overlap); an agent behind a
-deeper desk (the Boss's 4×2 console) overrides it per-agent with
-`labelOffsetY` in its `agents` entry. Keep at least one empty tile row
+**below the desk block** via `theme.agentLabelOffsetY` (the example uses `30`
+on 32px tiles, so the plate reads as a floor nameplate in front of the
+workstation); an agent behind a deeper desk (the Boss's 4×2 console)
+overrides it per-agent with `labelOffsetY` in its `agents` entry. Keep at
+least one empty tile row
 between stacked workstations — the example uses a 4-row pitch so status
 badges never crowd the next agent's nameplate.
 
@@ -39,6 +40,9 @@ badges never crowd the next agent's nameplate.
   `selectionColor`, `ambientOverlayColor/Alpha`, `statusBadgeScale`.
 - One bright accent per meaning: cyan = activity, amber = review/warning,
   red = failure, violet/gold = Boss.
+- `hoverColor` / `selectionColor` tint the agent selection indicator — a
+  translucent rectangle behind the character plus a breathing corner-bracket
+  reticle (hover = `hoverColor`, click/select = `selectionColor`).
 
 ## Switch / add a theme (Day Office ↔ Night Control Room)
 
@@ -62,16 +66,18 @@ themes are entirely data.
   (default) or `'hover'` — the example keeps agent nameplates always-on and
   shows object labels only on hover.
 - Agent chips render below the feet anchor; `theme.agentLabelOffsetY`
-  pushes them further down past the desk block so they read as a
-  **nameplate on the desk's front edge** (the example uses `22` with 32px
+  pushes them down **past the desk block** so they read as a **floor
+  nameplate in front of the workstation** (the example uses `30` with 32px
   desk tiles). Style the plaque via `theme.agentLabel` — the example uses a
-  dark plate, light text and a brass `borderColor` so plates never blend
-  into the floor; font size lives in `agentLabel.fontSize` /
-  `objectLabel.fontSize`.
+  dark plate, light text, a brass `borderColor` and `fontSize: 10` so plates
+  stay legible and never blend into the floor; font size lives in
+  `agentLabel.fontSize` / `objectLabel.fontSize`.
 - `theme.statusBadgeScale` scales the status pills;
-  `theme.statusBadgeOffsetY` adds air between the sprite top and the badge —
-  with front-facing agents nothing sits above their heads, so the example
-  uses `2`. `statusBadgeText: false` switches badges to dot-only.
+  `theme.statusBadgeOffsetY` offsets the badge above the sprite top — a
+  **negative** value (the example uses `-8`) drops it down close to the head.
+  **Idle** agents (per `theme.agentIdleStatuses`, default `['idle']`) show no
+  badge at all; busy agents show a shimmering `<status>…` pill.
+  `statusBadgeText: false` switches badges to dot-only.
 - Per-entity opt-out: `showLabel: false` on any agent/object entry.
 - `labels.floor: false` (example default) — no decorative floor text; zones
   read through layout and furniture instead.
@@ -97,8 +103,11 @@ Nothing else changes — entity code references assets only by key.
    the script writes `agent-<role>.png` AND regenerates ATTRIBUTIONS.md for
    the new source sheets. Agents face the viewer: differentiate roles with
    hair, outfit, colors and accessories.
-2. Register `{ key: 'agent:<role>', url: ... }` in the scene config assets
-   (`frameWidth: 64`).
+2. Register the sprite in the scene config `assets`. The composer emits a
+   4-frame strip, so declare its animation states:
+   `{ key: 'agent:<role>', url, frameWidth: 64, frameCount: 4, states: {`
+   `idle: { from: 0, count: 1 }, active: { from: 1, count: 3, speed: 0.14 } } }`
+   — idle pose + typing loop (see [scene-schema.md](./scene-schema.md)).
 3. Use the role in an `agents` entry. Custom role strings are allowed by the
    schema; nothing in the kit needs patching.
 

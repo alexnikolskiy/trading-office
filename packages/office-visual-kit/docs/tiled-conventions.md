@@ -134,17 +134,21 @@ Layout conventions that made the example read as a real office:
   line); trash bins sit on the lower wall row, drawn at the bottom of
   their tile;
 - the Boss command console is painted as **furniture tiles** (the 4×2
-  `console_<part>_<t|b>` mahogany block) with a sprite-less
-  `interactive_objects` rect as its hit-area — that way the Boss's
-  nameplate (entity layer) always draws above the desk; use the same trick
-  for any clickable tile furniture;
+  `console_<part>_<t|b>` mahogany block; three monitors stand on the
+  desktop) — it is **not** an interactive object (the console itself isn't
+  clickable). The sprite-less-hit-area trick (a rect in `interactive_objects`
+  over tile-painted furniture) is still how you make such furniture
+  clickable — the example uses it for the **entrance door**
+  (`panelTarget: 'exit'`);
 - an **infra/server room** sits behind a glass partition (`glass_h`,
   `glass_door_l/r`, `glass_v`, `glass_corner_l/r` tiles in `furniture`)
-  over a `floor_tech` floor; the corner tiles stop the horizontal run AT
-  the vertical band so the room has square corners, and the door tiles
-  drop the base rail (pane to the floor + handles + sensor) so the
-  entrance reads as a door; server rack / archive / bot-status live inside
-  as object sprites;
+  over a `floor_tech` floor — the side-wall columns use half-tech edge tiles
+  (`floor_tech_edge_l/r`, plank outside + tech inside) so the floor sits
+  flush to the glass walls without spilling outside the room; the corner
+  tiles stop the horizontal run AT the vertical band so the room has square
+  corners, and the door tiles drop the base rail (pane to the floor +
+  handles + sensor) so the entrance reads as a door; server rack / archive /
+  bot-status live inside as object sprites;
 - plants in seams and corners (top plants on the lower wall row, flush
   against the wall); no random props in open floor.
 

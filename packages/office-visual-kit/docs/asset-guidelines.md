@@ -42,8 +42,9 @@ ends where the desk begins (spawn point = desk block top edge), so the desk
 + monitor cover the lap. The monitor's screen faces the agent; the viewer
 sees its aluminum back. A role must read through hair style/color, outfit
 and accessories (glasses etc.). The Boss is suited (gold tie) in a winged
-executive chair behind the deep mahogany console. Agents sit still — both
-strip frames are identical, no idle bobbing.
+executive chair behind the deep mahogany console. Each agent is a 4-frame
+status-driven strip: a still idle pose (frame 0) plus a 3-frame hands-only
+typing loop (frames 1–3) — held while idle, played while the agent works.
 
 All art is drawn once in the Day Office palette. The night tileset is derived
 automatically: `nightify()` pushes every pixel toward a dark blue cast except
@@ -85,12 +86,13 @@ layers by `tools/compose-lpc-agents.mjs` in the example: it loads each
 layer's `sit.png` sheet, recolors it with the generator's own palette
 ramps, composites the layers in the generator's zPos order on the
 south-facing chair-sit frame, draws an original office chair behind the
-figure, and crops the seated bust at the desk cut line. The composed PNGs
+figure, crops the seated bust at the desk cut line, and emits a 4-frame
+strip (idle pose + a 3-frame hands-only typing loop). The composed PNGs
 plus the licensing docs are committed under:
 
 ```text
 examples/<floor>/public/assets/third-party/lpc/
-  agent-<role>.png  — 2-frame strip (identical frames), feet/desk-edge anchor
+  agent-<role>.png  — 4-frame strip (idle pose + typing loop), feet/desk-edge anchor
   SOURCE.md         — generator repo + exact commit + reproduce steps
   ATTRIBUTIONS.md   — every source file's authors/licenses/URLs, regenerated
                       from the generator's CREDITS.csv by the composer
