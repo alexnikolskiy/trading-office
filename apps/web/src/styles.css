@@ -100,3 +100,6 @@ body {
 /* scene error */
 .scene-error { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: var(--danger); background: rgba(8, 10, 16, 0.85); padding: 16px; text-align: center; }
 .scene-error pre { color: var(--muted); font-size: 11px; white-space: pre-wrap; max-width: 80%; }
+
+/* dock content wrapper fills the dock so panels flex to full height */
+.dock__content { flex: 1; min-height: 0; display: flex; flex-direction: column; }
