@@ -6,7 +6,7 @@ import { MockOfficeGateway } from './MockOfficeGateway';
 // Connected (real HTTP serialization, in-process Hono) must equal mock on every
 // deterministic snapshot — proving the wire contract + serialization is lossless.
 const { app } = createFixtureOfficeApp({ OFFICE_FIXTURE_LATENCY_MS: '0' });
-const http = new HttpOfficeGateway({ baseUrl: 'http://conformance.local', fetchImpl: (url, init) => app.request(url, init) });
+const http = new HttpOfficeGateway({ baseUrl: 'http://conformance.local', fetchImpl: (url, init) => Promise.resolve(app.request(url, init)) });
 const mock = new MockOfficeGateway({ latencyMs: 0 });
 
 describe('mock == connected (deterministic snapshots)', () => {
