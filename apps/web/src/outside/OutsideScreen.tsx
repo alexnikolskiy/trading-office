@@ -60,7 +60,7 @@ export function OutsideScreen() {
           type="button"
           className="outside__door"
           onClick={handleDoor}
-          aria-label={session.user ? 'Enter the Trading Lab floor' : 'Open sign-in'}
+          aria-label={session.user ? 'Enter the Trading Lab floor' : 'Knock to sign in'}
         >
           <span className="outside__door-hint">
             {session.user ? 'Enter →' : 'Knock'}
