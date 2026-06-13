@@ -6,18 +6,17 @@
   "type": "module",
   "description": "Trading Lab Research Floor — Office Visual Builder Kit example preview",
   "scripts": {
+    "predev": "node ../../tools/sync-floor-public.mjs examples/trading-lab-research-floor/public",
     "dev": "vite",
+    "prebuild": "node ../../tools/sync-floor-public.mjs examples/trading-lab-research-floor/public",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit",
-    "generate": "node tools/generate-assets.mjs && node tools/generate-map.mjs",
-    "generate:assets": "node tools/generate-assets.mjs",
-    "generate:map": "node tools/generate-map.mjs",
-    "compose:lpc": "node tools/compose-lpc-agents.mjs"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@pixi/react": "^8.0.0",
     "@trading-office/office-visual-kit": "*",
+    "@trading-office/trading-lab-floor": "*",
     "pixi-viewport": "^6.0.3",
     "pixi.js": "^8.6.0",
     "react": "^19.1.0",
