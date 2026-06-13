@@ -2,7 +2,7 @@
   "name": "trading-office",
   "version": "0.1.0",
   "private": true,
-  "description": "AI Office Shell / Control Room — Phase 0: Office Visual Builder Kit",
+  "description": "Trading Office — AI Office Shell / Control Room",
   "license": "MIT",
   "workspaces": [
     "packages/*",
