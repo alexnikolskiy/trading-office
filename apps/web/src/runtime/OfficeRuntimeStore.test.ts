@@ -17,4 +17,13 @@ describe('OfficeRuntimeStore.reduce', () => {
     store.reduce({ type: 'agent_trace_appended', ts: '3', agentId: 'boss', line: { ts: '3', level: 'info', text: 'x' } });
     expect(store.getSnapshot().statuses).toEqual({ boss: 'thinking' });
   });
+
+  it('tracks shell connection state without touching statuses', () => {
+    const store = new OfficeRuntimeStore();
+    store.reduce({ type: 'agent_statuses_snapshot', ts: '1', statuses: { boss: 'thinking' } });
+    expect(store.getSnapshot().connection).toBe('connected');
+    store.setConnection('reconnecting');
+    expect(store.getSnapshot().connection).toBe('reconnecting');
+    expect(store.getSnapshot().statuses).toEqual({ boss: 'thinking' });
+  });
 });

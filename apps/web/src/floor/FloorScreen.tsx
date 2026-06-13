@@ -8,7 +8,7 @@ import { OfficeSceneCanvas } from '@trading-office/office-visual-kit/react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMatch, useNavigate } from 'react-router-dom';
 import { type FloorThemeName } from '@trading-office/trading-lab-floor';
-import { useGateway, useRuntimeStore } from '../runtime/RuntimeContext';
+import { useGateway, useRuntimeStore, useConnectionStatus } from '../runtime/RuntimeContext';
 import { applyStatusToScene } from '../runtime/sceneBridge';
 import { INITIAL_STATUSES } from '@trading-office/office-fixtures';
 import { buildFloorConfig, FLOOR_BASE_PATH, panelTargetToObjectId } from './floorConfig';
@@ -32,6 +32,8 @@ export function FloorScreen({
   const navigate = useNavigate();
   const store = useRuntimeStore();
   const gateway = useGateway();
+  const connection = useConnectionStatus();
+  const degraded = connection === 'reconnecting' || connection === 'disconnected' || connection === 'error';
 
   const config = useMemo(() => buildFloorConfig(themeName), [themeName]);
   const targetToObject = useMemo(() => panelTargetToObjectId(config), [config]);
@@ -147,6 +149,12 @@ export function FloorScreen({
       >
         Operator
       </button>
+
+      {degraded && (
+        <div className="floor__conn-warning" role="alert">
+          Connection {connection} — live data may be stale. (No fallback to mock.)
+        </div>
+      )}
 
       <PanelDock
         open={opensDock(panelKind)}

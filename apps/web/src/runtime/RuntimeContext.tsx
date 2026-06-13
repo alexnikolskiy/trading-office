@@ -1,6 +1,7 @@
 import {
   createContext,
   useContext,
+  useEffect,
   useMemo,
   useSyncExternalStore,
   type ReactNode,
@@ -9,6 +10,7 @@ import { MockOfficeGateway } from './MockOfficeGateway';
 import { HttpOfficeGateway } from './HttpOfficeGateway';
 import { OfficeRuntimeStore } from './OfficeRuntimeStore';
 import type { OfficeGateway } from './OfficeGateway';
+import type { ConnectionStatus } from './OfficeRuntimeStore';
 import type { AgentStatusMap } from './types';
 
 interface RuntimeContextValue {
@@ -27,11 +29,24 @@ function createGateway(): OfficeGateway {
   return new MockOfficeGateway();
 }
 
+interface ConnectionSignaling {
+  subscribeConnection(cb: (s: ConnectionStatus) => void): () => void;
+}
+function isConnectionSignaling(g: unknown): g is ConnectionSignaling {
+  return typeof (g as { subscribeConnection?: unknown }).subscribeConnection === 'function';
+}
+
 export function RuntimeProvider({ children }: { children: ReactNode }) {
   const value = useMemo<RuntimeContextValue>(
     () => ({ gateway: createGateway(), store: new OfficeRuntimeStore() }),
     [],
   );
+  useEffect(() => {
+    if (isConnectionSignaling(value.gateway)) {
+      return value.gateway.subscribeConnection((s) => value.store.setConnection(s));
+    }
+    value.store.setConnection('connected'); // mock mode: always connected
+  }, [value]);
   return <RuntimeContext.Provider value={value}>{children}</RuntimeContext.Provider>;
 }
 
@@ -52,4 +67,9 @@ export function useRuntimeStore(): OfficeRuntimeStore {
 export function useAgentStatuses(): AgentStatusMap {
   const { store } = useRuntime();
   return useSyncExternalStore(store.subscribe, () => store.getSnapshot().statuses);
+}
+
+export function useConnectionStatus(): ConnectionStatus {
+  const { store } = useRuntime();
+  return useSyncExternalStore(store.subscribe, () => store.getSnapshot().connection);
 }

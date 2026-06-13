@@ -13,6 +13,7 @@ import {
   type OperatorMessage,
   type OperatorMessageAccepted,
 } from '@trading-office/office-gateway';
+import type { ConnectionStatus } from './OfficeRuntimeStore';
 
 interface WebSocketLike {
   send(data: string): void;
@@ -40,6 +41,20 @@ export class HttpOfficeGateway implements OfficeGateway {
   private readonly subscribers = new Set<(e: OfficeEvent) => void>();
   private attempts = 0;
   private closedByUs = false;
+  private connectionStatus: ConnectionStatus = 'connected';
+  private readonly connectionSubs = new Set<(s: ConnectionStatus) => void>();
+
+  subscribeConnection(cb: (s: ConnectionStatus) => void): () => void {
+    this.connectionSubs.add(cb);
+    cb(this.connectionStatus);
+    return () => { this.connectionSubs.delete(cb); };
+  }
+
+  private setConnection(s: ConnectionStatus): void {
+    if (this.connectionStatus === s) return;
+    this.connectionStatus = s;
+    for (const cb of this.connectionSubs) cb(s);
+  }
 
   constructor(opts: HttpOfficeGatewayOptions) {
     this.baseUrl = opts.baseUrl.replace(/\/$/, '');
@@ -53,8 +68,10 @@ export class HttpOfficeGateway implements OfficeGateway {
     if (!res.ok) {
       let detail = res.statusText;
       try { const body = (await res.json()) as { error?: { message?: string } }; detail = body?.error?.message ?? detail; } catch { /* keep statusText */ }
+      this.setConnection('error');
       throw new Error(`office GET ${path} failed: ${res.status} ${detail}`); // surfaced — NO silent fallback
     }
+    if (!this.ws) this.setConnection('connected');
     return (await res.json()) as T;
   }
 
@@ -86,16 +103,17 @@ export class HttpOfficeGateway implements OfficeGateway {
   }
 
   private connect(): void {
+    this.setConnection('connecting');
     this.closedByUs = false;
     const ws = this.wsFactory(this.wsUrl + OFFICE_API.events);
     this.ws = ws;
-    ws.addEventListener('open', () => { this.attempts = 0; });
+    ws.addEventListener('open', () => { this.attempts = 0; this.setConnection('connected'); });
     ws.addEventListener('message', (ev) => {
       const raw = typeof ev.data === 'string' ? safeJson(ev.data) : ev.data;
       const parsed = officeEventSchema.safeParse(raw);
       if (parsed.success) for (const fn of this.subscribers) fn(parsed.data);
     });
-    ws.addEventListener('close', () => { this.ws = null; this.scheduleReconnect(); });
+    ws.addEventListener('close', () => { this.ws = null; this.setConnection(this.attempts >= MAX_RECONNECT_ATTEMPTS ? 'disconnected' : 'reconnecting'); this.scheduleReconnect(); });
     ws.addEventListener('error', () => { /* do not swallow in the UI: a close + reconnect follows */ });
   }
 

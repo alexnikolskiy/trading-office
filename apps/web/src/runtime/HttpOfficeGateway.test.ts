@@ -16,6 +16,8 @@ class FakeWs {
   send() {}
   close() { this.closed = true; (this.listeners['close'] ?? []).forEach((f) => f({})); }
   emit(event: unknown) { (this.listeners['message'] ?? []).forEach((f) => f({ data: JSON.stringify(event) })); }
+  open() { (this.listeners['open'] ?? []).forEach((f) => f({})); }
+  drop() { (this.listeners['close'] ?? []).forEach((f) => f({})); }
 }
 
 describe('HttpOfficeGateway', () => {
@@ -53,5 +55,23 @@ describe('HttpOfficeGateway', () => {
     expect(b).toEqual(['heartbeat']);
     offA(); offB();
     expect(sockets[0]!.closed).toBe(true);
+  });
+
+  it('signals connection state across the WS lifecycle', () => {
+    const sockets: FakeWs[] = [];
+    const gw = new HttpOfficeGateway({
+      baseUrl: 'http://x',
+      fetchImpl: async () => jsonResponse(null),
+      wsFactory: (url) => { const s = new FakeWs(url); sockets.push(s); return s; },
+    });
+    const seen: string[] = [];
+    gw.subscribeConnection((s) => seen.push(s));
+    const off = gw.subscribeOfficeEvents!(() => {});
+    expect(seen).toContain('connecting');
+    sockets[0]!.open();
+    expect(seen).toContain('connected');
+    sockets[0]!.drop();
+    expect(seen.some((s) => s === 'reconnecting' || s === 'disconnected')).toBe(true);
+    off();
   });
 });
