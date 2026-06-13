@@ -67,7 +67,11 @@ export function createOfficeApp(deps: OfficeAppDeps) {
   return { app, injectWebSocket };
 }
 
-/** Test/demo convenience: a fully fixture-wired app (config + bus + connector). */
+/**
+ * Test/demo convenience: a fully fixture-wired app (config + bus + connector).
+ * NOTE: HTTP-snapshot only — it does NOT start the live producer/heartbeat, so
+ * its WS emits just the initial snapshot. The runnable `index.ts` starts those.
+ */
 export function createFixtureOfficeApp(env: Record<string, string | undefined> = {}) {
   const config = loadConfig(env);
   const bus = new OfficeEventBus();

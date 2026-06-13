@@ -38,7 +38,8 @@ describe('WS /api/office/events', () => {
     expect(bus.size).toBe(1);
 
     ws.close();
-    await new Promise((r) => setTimeout(r, 80));
+    const deadline = Date.now() + 2000;
+    while (bus.size > 0 && Date.now() < deadline) await new Promise((r) => setTimeout(r, 10));
     expect(bus.size).toBe(0);
 
     stopProducer();
