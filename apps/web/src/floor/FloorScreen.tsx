@@ -10,7 +10,7 @@ import { useMatch, useNavigate } from 'react-router-dom';
 import { type FloorThemeName } from '@trading-office/trading-lab-floor';
 import { useGateway, useRuntimeStore } from '../runtime/RuntimeContext';
 import { applyStatusToScene } from '../runtime/sceneBridge';
-import { INITIAL_STATUSES } from '../runtime/fixtures';
+import { INITIAL_STATUSES } from '@trading-office/office-fixtures';
 import { buildFloorConfig, FLOOR_BASE_PATH, panelTargetToObjectId } from './floorConfig';
 import { selectionKey, type RouteSelection } from './floorSelection';
 import {
@@ -47,9 +47,11 @@ export function FloorScreen({
   // Route → selection
   const agentMatch = useMatch(`${FLOOR_BASE_PATH}/agent/:agentId`);
   const panelMatch = useMatch(`${FLOOR_BASE_PATH}/panel/:panelTarget`);
+  const operatorMatch = useMatch(`${FLOOR_BASE_PATH}/operator`);
   const sel: RouteSelection = {
     agentId: agentMatch?.params.agentId,
     panelTarget: panelMatch?.params.panelTarget,
+    operator: !!operatorMatch,
   };
   const panelKind = resolvePanel(sel, agentInfos);
   const selKey = selectionKey(sel);
@@ -118,8 +120,8 @@ export function FloorScreen({
       store.setStatuses(INITIAL_STATUSES);
       return;
     }
-    if (!gateway.subscribeAgentStatuses) return;
-    const off = gateway.subscribeAgentStatuses((statuses) => store.setStatuses(statuses));
+    if (!gateway.subscribeOfficeEvents) return;
+    const off = gateway.subscribeOfficeEvents((e) => store.reduce(e));
     return off;
   }, [simulate, gateway, store]);
 
@@ -136,6 +138,15 @@ export function FloorScreen({
           onEntitySelect={onEntitySelect}
         />
       </div>
+
+      <button
+        type="button"
+        className="floor__operator-btn"
+        aria-pressed={!!operatorMatch}
+        onClick={() => navigate(operatorMatch ? FLOOR_BASE_PATH : `${FLOOR_BASE_PATH}/operator`)}
+      >
+        Operator
+      </button>
 
       <PanelDock
         open={opensDock(panelKind)}
