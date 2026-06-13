@@ -20,15 +20,18 @@ import { fileURLToPath } from 'node:url';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const sourceRoot = join(repoRoot, 'packages', 'trading-lab-floor', 'public');
+// Only runtime-served subtrees are mirrored. assets/ASSETS.md (licensing docs)
+// sits outside these and is deliberately NOT synced.
 const SYNCED = ['maps', join('assets', 'generated'), join('assets', 'third-party')];
 
-const [, , targetPublicArg, flag] = process.argv;
+const args = process.argv.slice(2);
+const check = args.includes('--check');
+const targetPublicArg = args.find((a) => !a.startsWith('--'));
 if (!targetPublicArg) {
   console.error('usage: node tools/sync-floor-public.mjs <consumer-public-dir> [--check]');
   process.exit(2);
 }
 const targetRoot = join(repoRoot, targetPublicArg);
-const check = flag === '--check';
 
 function* walk(dir) {
   for (const name of readdirSync(dir)) {
