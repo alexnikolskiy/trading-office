@@ -1,4 +1,5 @@
 import type { AgentStatus, AgentStatusMap } from './types';
+import type { OfficeEvent } from '@trading-office/office-gateway';
 
 export interface RuntimeState {
   statuses: AgentStatusMap;
@@ -21,6 +22,12 @@ export class OfficeRuntimeStore {
     if (this.state.statuses[agentId] === status) return;
     this.state = { statuses: { ...this.state.statuses, [agentId]: status } };
     this.emit();
+  }
+
+  /** Narrow reducer: only floor-shell status state. Other events are panel-local. */
+  reduce(e: OfficeEvent): void {
+    if (e.type === 'agent_statuses_snapshot') this.setStatuses(e.statuses);
+    else if (e.type === 'agent_status_changed') this.setStatus(e.agentId, e.status);
   }
 
   setStatuses(statuses: AgentStatusMap): void {
