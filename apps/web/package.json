@@ -14,6 +14,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "predev:web:connected": "node ../../tools/sync-floor-public.mjs apps/web/public",
+    "dev:web:connected": "vite --mode connected",
     "verify:assets": "node ../../tools/sync-floor-public.mjs apps/web/public --check"
   },
   "dependencies": {
