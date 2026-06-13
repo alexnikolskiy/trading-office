@@ -6,6 +6,7 @@ import {
   operatorMessageSchema,
   operatorMessageAcceptedSchema,
   officeErrorBodySchema,
+  officeEventSchema,
 } from './schemas';
 
 describe('contract schemas round-trip', () => {
@@ -43,5 +44,21 @@ describe('contract schemas round-trip', () => {
   it('shapes an error body', () => {
     const e = { error: { code: 'not_found', message: 'no such agent' } };
     expect(officeErrorBodySchema.parse(e)).toEqual(e);
+  });
+});
+
+describe('OfficeEvent schema', () => {
+  it('accepts a heartbeat event', () => {
+    const e = { type: 'heartbeat', ts: '2024-01-01T00:00:00Z' };
+    expect(officeEventSchema.parse(e)).toEqual(e);
+  });
+
+  it('accepts an agent_status_changed event', () => {
+    const e = { type: 'agent_status_changed', ts: '2024-01-01T00:00:00Z', agentId: 'researcher', status: 'thinking' };
+    expect(officeEventSchema.parse(e)).toEqual(e);
+  });
+
+  it('rejects an event with an unknown type', () => {
+    expect(() => officeEventSchema.parse({ type: 'unknown_event', ts: '2024-01-01T00:00:00Z' })).toThrow();
   });
 });

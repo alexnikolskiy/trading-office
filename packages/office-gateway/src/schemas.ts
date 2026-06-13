@@ -81,3 +81,17 @@ export const operatorReplySchema = z.object({
 
 export const officeErrorSchema = z.object({ code: z.string(), message: z.string() });
 export const officeErrorBodySchema = z.object({ error: officeErrorSchema });
+
+export const officeEventSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('agent_statuses_snapshot'), ts: z.string(), statuses: agentStatusMapSchema }),
+  z.object({ type: z.literal('agent_status_changed'), ts: z.string(), agentId: z.string(), status: agentStatusSchema }),
+  z.object({ type: z.literal('agent_trace_appended'), ts: z.string(), agentId: z.string(), line: traceLineSchema }),
+  z.object({ type: z.literal('operator_message_accepted'), ts: z.string(), operatorMessageId: z.string(), conversationId: z.string() }),
+  z.object({ type: z.literal('operator_message_progress'), ts: z.string(), operatorMessageId: z.string(), conversationId: z.string(), replyMessageId: z.string(), stage: z.string().optional(), note: z.string().optional() }),
+  z.object({ type: z.literal('operator_message_delta'), ts: z.string(), operatorMessageId: z.string(), conversationId: z.string(), replyMessageId: z.string(), textDelta: z.string() }),
+  z.object({ type: z.literal('operator_message_completed'), ts: z.string(), operatorMessageId: z.string(), conversationId: z.string(), replyMessageId: z.string(), reply: operatorReplySchema }),
+  z.object({ type: z.literal('operator_message_failed'), ts: z.string(), operatorMessageId: z.string(), conversationId: z.string(), replyMessageId: z.string().optional(), error: officeErrorSchema }),
+  z.object({ type: z.literal('system_notice'), ts: z.string(), level: z.enum(['info', 'warn', 'error']), text: z.string() }),
+  z.object({ type: z.literal('office_error'), ts: z.string(), error: officeErrorSchema }),
+  z.object({ type: z.literal('heartbeat'), ts: z.string() }),
+]);
