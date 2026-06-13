@@ -1,3 +1,5 @@
+import { useEffect } from 'react';
+
 export function ExitConfirm({
   onConfirm,
   onCancel,
@@ -5,6 +7,14 @@ export function ExitConfirm({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onCancel();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onCancel]);
+
   return (
     <div className="modal-backdrop" role="presentation" onClick={onCancel}>
       <div
@@ -13,9 +23,6 @@ export function ExitConfirm({
         aria-modal="true"
         aria-label="Leave floor"
         onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => {
-          if (e.key === 'Escape') onCancel();
-        }}
       >
         <h2>Return to lobby?</h2>
         <p className="panel__state">You stay signed in — re-enter through the door anytime.</p>
