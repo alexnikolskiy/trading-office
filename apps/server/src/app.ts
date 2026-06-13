@@ -4,8 +4,10 @@ import { cors } from 'hono/cors';
 import { OFFICE_API, operatorMessageSchema } from '@trading-office/office-gateway';
 import type { OfficeEvent } from '@trading-office/office-gateway';
 import type { OfficeServerConfig } from './config';
+import { loadConfig } from './config';
 import type { OfficeReadConnector } from './connector/OfficeReadConnector';
-import type { OfficeEventBus } from './events/OfficeEventBus';
+import { FixtureOfficeReadConnector } from './connector/FixtureOfficeReadConnector';
+import { OfficeEventBus } from './events/OfficeEventBus';
 import { handleOperatorMessage } from './operator/responder';
 
 const nowIso = (): string => new Date().toISOString();
@@ -63,4 +65,13 @@ export function createOfficeApp(deps: OfficeAppDeps) {
   );
 
   return { app, injectWebSocket };
+}
+
+/** Test/demo convenience: a fully fixture-wired app (config + bus + connector). */
+export function createFixtureOfficeApp(env: Record<string, string | undefined> = {}) {
+  const config = loadConfig(env);
+  const bus = new OfficeEventBus();
+  const connector = new FixtureOfficeReadConnector(config);
+  const built = createOfficeApp({ connector, bus, config });
+  return { ...built, bus, connector, config };
 }
