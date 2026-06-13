@@ -1,4 +1,5 @@
 import type { RouteSelection } from './floorSelection';
+import { OBJECT_PANEL_TARGETS, type ObjectPanelTarget } from './objectPanels';
 
 export interface FloorAgentInfo {
   id: string;
@@ -8,18 +9,12 @@ export interface FloorAgentInfo {
 export type PanelKind =
   | { kind: 'boss-command' }
   | { kind: 'agent-activity'; agentId: string }
-  | { kind: 'object'; panelTarget: string }
+  | { kind: 'object'; panelTarget: ObjectPanelTarget }
   | { kind: 'exit' }
   | { kind: 'none' }
   | { kind: 'unknown'; key: string };
 
-const KNOWN_OBJECT_PANELS = new Set([
-  'hypothesis-pipeline',
-  'backtest-summary',
-  'bot-health',
-  'knowledge-base',
-  'infra-status',
-]);
+const KNOWN_OBJECT_PANELS = new Set<string>(OBJECT_PANEL_TARGETS);
 
 export function resolvePanel(
   sel: RouteSelection,
@@ -34,7 +29,9 @@ export function resolvePanel(
   if (sel.panelTarget) {
     if (sel.panelTarget === 'exit') return { kind: 'exit' };
     if (KNOWN_OBJECT_PANELS.has(sel.panelTarget)) {
-      return { kind: 'object', panelTarget: sel.panelTarget };
+      // Safe: membership in KNOWN_OBJECT_PANELS (derived from OBJECT_PANEL_TARGETS)
+      // is exactly the ObjectPanelTarget union.
+      return { kind: 'object', panelTarget: sel.panelTarget as ObjectPanelTarget };
     }
     return { kind: 'unknown', key: `panel:${sel.panelTarget}` };
   }
