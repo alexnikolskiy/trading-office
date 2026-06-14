@@ -51,7 +51,7 @@ export function mapBacktest(b: LabBacktest): BacktestSummary {
     period: null,
     pnlPct: m.netPnlPct,
     sharpe: m.sharpe,
-    winRatePct: m.winRate === null ? null : Math.round(m.winRate * 100),
+    winRatePct: m.winRate === null ? null : Math.round(m.winRate * 10000) / 100,
     maxDrawdownPct: m.maxDrawdownPct,
   };
 }
