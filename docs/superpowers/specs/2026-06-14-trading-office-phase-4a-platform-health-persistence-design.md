@@ -173,7 +173,7 @@ Honesty is preserved end-to-end, by construction:
 
 - **Persistence disabled / `DATABASE_URL` unset** (market-service default) → `NoopHealthSnapshotSink` writes nothing → no `market`/`coverage` rows → readers return `null` → `/ops/health/market` & `/ops/coverage` report `availability:'unavailable'` → (Phase 4b) office shows a `gap`. No fabrication.
 - **Writer alive, data fresh** → real status (`ok|degraded|down`).
-- **Writer died / stalled** → latest row's `captured_at_ms` exceeds `PLATFORM_HEALTH_STALENESS_MS` (120 s) → reader reports `degraded`/`down`. **Process death becomes visible** — strictly better than today.
+- **Writer died / stalled** → latest row's `captured_at_ms` exceeds `PLATFORM_HEALTH_STALENESS_MS` (120 s) → reader returns `null` → `availability:'unavailable'` (the office renders this as a gap). **Process death becomes visible** — strictly better than today.
 - **Coverage off** (`useAggregatedMarketData` disabled) → empty/`unsupported` rollup → honest `unsupported`, never guessed `present`.
 - **execution-health** with no recent `execution_*` rows → `unavailable`; this is honest "no recent execution activity", explicitly **not** a claim about broker connectivity.
 
@@ -228,11 +228,11 @@ Hard constraints for this and any follow-on monitoring work, fixed here:
 |---|---|
 | market-service `DATABASE_URL` unset or `MARKET_HEALTH_PERSIST=off` | `NoopHealthSnapshotSink`; no rows; market/coverage read `unavailable`; market-service unaffected |
 | PG write fails (sink) | swallowed + logged once; bounded timeout; no retry storm; heartbeat loop never blocks |
-| latest snapshot stale (> `*_STALE_MS`) | reader reports `degraded`/`down` (writer-death visible) |
+| latest snapshot stale (> `PLATFORM_HEALTH_STALENESS_MS`) | reader returns `null` → `availability:'unavailable'` (writer-death visible as a gap) |
 | no snapshot row | reader returns `null` → handler `availability:'unavailable'` |
 | ops-read PG unreachable | existing behavior — `internal_read_error` / `unavailable`, never fabricated |
 | coverage with aggregation off | `unsupported` rollup; honest |
-| runtime gate unbuildable (log unreadable / parse / timeout) | skip write (row goes stale → degraded) or honest down-indicators; **never** fake `ok` |
+| runtime gate unbuildable (log unreadable / parse / timeout) | skip write → row goes stale → reader `unavailable`; **never** fake `ok` |
 | no recent `execution_*` events | execution-health `unavailable` (honest "no recent activity") |
 
 ---
