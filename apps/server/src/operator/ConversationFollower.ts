@@ -17,9 +17,10 @@ export interface ConversationFollowerDeps {
   ids: FollowerIds;
   taskId: string;
   taskType?: string;
-  /** True when the chat response carried plannedNextStep: a chain is expected, so the first task's
-   *  success-terminal is NOT the plan's terminal — keep streaming and finish honestly via guard. */
-  expectChain?: boolean;
+  /** When the chat response carried plannedNextStep, the chained task's type. Presence means a chain
+   *  is expected: the ORIGINAL task's success-terminal advances (streamed as a progress delta) to
+   *  waiting for THIS type's terminal, instead of completing the turn. */
+  nextTaskType?: string;
   emit: (e: OfficeEvent) => void;
   client: Pick<TradingLabHttpClient, 'getAgentEvents'>;
   bridge: Pick<TradingLabStreamBridge, 'subscribeAppended'>;
@@ -35,6 +36,7 @@ export class ConversationFollower {
   private readonly schedule: (ms: number, cb: () => void) => () => void;
   private done = false;
   private deltaCount = 0;
+  private chainAdvanced = false;
   private readonly accumulated: string[] = [];
 
   constructor(private readonly deps: ConversationFollowerDeps) {
@@ -96,10 +98,17 @@ export class ConversationFollower {
           finish(() => this.finishFailed(e.summary));
           return;
         }
-        // A planned chain (expectChain) means the first task's success-terminal is NOT plan-complete;
-        // keep streaming the chained task's deltas and let the guard finish honestly (we don't know the
-        // chained task's terminal type, so we never assert success on its behalf).
-        if (!this.deps.expectChain && this.deps.taskType && successTypesFor(this.deps.taskType).includes(e.type)) {
+        // Success-terminal detection against the CURRENTLY expected task type (the original task, or —
+        // after a planned chain advances — the chained task). For a planned chain, the original task's
+        // terminal does NOT complete: it streams as a progress delta and we advance to await the chained
+        // task's terminal. We never assert success for a chained task whose terminal type is unknown.
+        const expectedType = this.chainAdvanced ? this.deps.nextTaskType : this.deps.taskType;
+        if (expectedType && successTypesFor(expectedType).includes(e.type)) {
+          if (this.deps.nextTaskType && !this.chainAdvanced) {
+            this.chainAdvanced = true;
+            this.emitDelta(e.summary);
+            return;
+          }
           finish(() => this.finishCompleted());
           return;
         }

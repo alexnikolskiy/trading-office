@@ -101,24 +101,98 @@ describe('ConversationFollower', () => {
     expect(out.some((e) => e.type === 'operator_message_failed')).toBe(false);
   });
 
-  it('with a planned chain (expectChain), does NOT complete on the first task terminal — finishes via guard', async () => {
+  it('chain: first (original) terminal advances as a delta, not a completion; guard finishes honestly', async () => {
     const bridge = fakeBridge();
     const timers: Array<{ ms: number; cb: () => void }> = [];
     const schedule = (ms: number, cb: () => void) => { const t = { ms, cb }; timers.push(t); return () => { const i = timers.indexOf(t); if (i >= 0) timers.splice(i, 1); }; };
     const out: OfficeEvent[] = [];
     const f = new ConversationFollower({
-      ids, taskId: 't1', taskType: 'strategy.onboard', expectChain: true, emit: (e) => out.push(e),
+      ids, taskId: 't1', taskType: 'strategy.onboard', nextTaskType: 'research.run_cycle', emit: (e) => out.push(e),
       client: clientWith([ev({ type: 'strategy_analyst.started', correlationId: 'corr1' })]) as never,
       bridge: bridge as never, guards: { ...guards, idleMs: 10 }, now: NOW, sleep: async () => {}, schedule,
     });
     const p = f.run();
     await tick();
-    bridge.push(ev({ type: 'strategy_analyst.completed', correlationId: 'corr1', summary: 'Strategy Analyst Completed' })); // first task terminal
-    expect(out.some((e) => e.type === 'operator_message_completed')).toBe(false); // chain pending → not done
-    timers.find((t) => t.ms === 10)!.cb(); // chained task goes quiet → idle guard finalizes honestly
+    bridge.push(ev({ type: 'strategy_analyst.completed', correlationId: 'corr1', summary: 'Strategy Analyst Completed' }));
+    expect(out.some((e) => e.type === 'operator_message_completed')).toBe(false);
+    expect(out.filter((e) => e.type === 'operator_message_delta')).toHaveLength(1);
+    timers.find((t) => t.ms === 10)!.cb();
     await p;
     const completed = out.find((e) => e.type === 'operator_message_completed') as Extract<OfficeEvent, { type: 'operator_message_completed' }>;
     expect(completed.reply.text).toMatch(/live progress stream ended/);
+  });
+
+  it('chain: completes on the correlated next-task success terminal', async () => {
+    const bridge = fakeBridge();
+    const out: OfficeEvent[] = [];
+    const f = new ConversationFollower({
+      ids, taskId: 't1', taskType: 'strategy.onboard', nextTaskType: 'research.run_cycle', emit: (e) => out.push(e),
+      client: clientWith([ev({ type: 'strategy_analyst.started', correlationId: 'corr1' })]) as never,
+      bridge: bridge as never, guards, now: NOW, sleep: async () => {}, schedule: noSchedule,
+    });
+    const p = f.run();
+    await tick();
+    bridge.push(ev({ type: 'strategy_analyst.completed', correlationId: 'corr1', summary: 'orig done' }));
+    expect(out.some((e) => e.type === 'operator_message_completed')).toBe(false);
+    bridge.push(ev({ type: 'research.run_cycle.completed', correlationId: 'corr1', summary: 'chain done' }));
+    await p;
+    expect(out.some((e) => e.type === 'operator_message_completed')).toBe(true);
+    expect(out.some((e) => e.type === 'operator_message_failed')).toBe(false);
+  });
+
+  it('chain: chat.plan.advance_failed fails the turn even though its prefix is noise', async () => {
+    const bridge = fakeBridge();
+    const out: OfficeEvent[] = [];
+    const f = new ConversationFollower({
+      ids, taskId: 't1', taskType: 'strategy.onboard', nextTaskType: 'research.run_cycle', emit: (e) => out.push(e),
+      client: clientWith([ev({ type: 'strategy_analyst.started', correlationId: 'corr1' })]) as never,
+      bridge: bridge as never, guards, now: NOW, sleep: async () => {}, schedule: noSchedule,
+    });
+    const p = f.run();
+    await tick();
+    bridge.push(ev({ type: 'chat.plan.advance_failed', correlationId: 'corr1', summary: 'Chat Plan Advance Failed' }));
+    await p;
+    expect(out.some((e) => e.type === 'operator_message_failed')).toBe(true);
+    expect(out.some((e) => e.type === 'operator_message_completed')).toBe(false);
+  });
+
+  it('chain: unknown next-task type never guesses success — guard finishes honestly', async () => {
+    const bridge = fakeBridge();
+    const timers: Array<{ ms: number; cb: () => void }> = [];
+    const schedule = (ms: number, cb: () => void) => { const t = { ms, cb }; timers.push(t); return () => { const i = timers.indexOf(t); if (i >= 0) timers.splice(i, 1); }; };
+    const out: OfficeEvent[] = [];
+    const f = new ConversationFollower({
+      ids, taskId: 't1', taskType: 'strategy.onboard', nextTaskType: 'totally.unknown', emit: (e) => out.push(e),
+      client: clientWith([ev({ type: 'strategy_analyst.started', correlationId: 'corr1' })]) as never,
+      bridge: bridge as never, guards: { ...guards, idleMs: 10 }, now: NOW, sleep: async () => {}, schedule,
+    });
+    const p = f.run();
+    await tick();
+    bridge.push(ev({ type: 'strategy_analyst.completed', correlationId: 'corr1', summary: 'orig done' }));
+    bridge.push(ev({ type: 'totally.unknown.completed', correlationId: 'corr1', summary: 'who knows' }));
+    expect(out.some((e) => e.type === 'operator_message_completed')).toBe(false);
+    timers.find((t) => t.ms === 10)!.cb();
+    await p;
+    const completed = out.find((e) => e.type === 'operator_message_completed') as Extract<OfficeEvent, { type: 'operator_message_completed' }>;
+    expect(completed.reply.text).toMatch(/live progress stream ended/);
+  });
+
+  it('chain: an uncorrelated next-task terminal is ignored (only correlated completes)', async () => {
+    const bridge = fakeBridge();
+    const out: OfficeEvent[] = [];
+    const f = new ConversationFollower({
+      ids, taskId: 't1', taskType: 'strategy.onboard', nextTaskType: 'research.run_cycle', emit: (e) => out.push(e),
+      client: clientWith([ev({ type: 'strategy_analyst.started', correlationId: 'corr1' })]) as never,
+      bridge: bridge as never, guards, now: NOW, sleep: async () => {}, schedule: noSchedule,
+    });
+    const p = f.run();
+    await tick();
+    bridge.push(ev({ type: 'strategy_analyst.completed', correlationId: 'corr1', summary: 'orig done' }));
+    bridge.push(ev({ type: 'research.run_cycle.completed', correlationId: 'OTHER', summary: 'someone else' }));
+    expect(out.some((e) => e.type === 'operator_message_completed')).toBe(false);
+    bridge.push(ev({ type: 'research.run_cycle.completed', correlationId: 'corr1', summary: 'ours' }));
+    await p;
+    expect(out.some((e) => e.type === 'operator_message_completed')).toBe(true);
   });
 
   it('maxDeltas cutoff finalizes honestly after N deltas', async () => {
