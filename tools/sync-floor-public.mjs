@@ -74,10 +74,18 @@ for (const sub of SYNCED) {
       }
     }
   } else {
-    // Strict mirror: wipe the target subdir first so deletions propagate.
-    rmSync(dst, { recursive: true, force: true });
-    mkdirSync(dirname(dst), { recursive: true });
+    // Mirror WITHOUT nuking the subtree. An `rm -rf` of a live publicDir breaks
+    // a running dev server's static serving — Vite/sirv loses the files and
+    // serves the SPA HTML for PNGs, so Pixi reports "source image could not be
+    // decoded" until the server is restarted. Copy in place (overwrites files,
+    // keeps the directory) and prune only genuine stale extras, so deletions
+    // still propagate.
+    mkdirSync(dst, { recursive: true });
     cpSync(src, dst, { recursive: true });
+    for (const dstFile of walk(dst)) {
+      const rel = relative(targetRoot, dstFile);
+      if (!existsSync(join(sourceRoot, rel))) rmSync(dstFile, { force: true });
+    }
   }
 }
 

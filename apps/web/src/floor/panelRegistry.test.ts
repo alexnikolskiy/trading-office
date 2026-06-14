@@ -14,7 +14,7 @@ describe('resolvePanel', () => {
   it('routes other agents to the activity panel', () => {
     expect(resolvePanel({ agentId: 'researcher' }, agents)).toEqual({ kind: 'agent-activity', agentId: 'researcher' });
   });
-  it('opens the operator chat from the /operator shell route (not a floor entity)', () => {
+  it('resolves the operator chat selection', () => {
     expect(resolvePanel({ operator: true }, agents)).toEqual({ kind: 'operator-chat' });
   });
   it('flags unknown agents', () => {

@@ -6,10 +6,16 @@
  * open in the Tiled editor; this script only exists so the example layout is
  * reproducible and reviewable in code.
  *
- * Visual Iteration 4 layout (20×17 tiles, 640×544 world). Workstations face
- * the viewer: the agent sits BEHIND its desk (one tile row above it),
- * front-facing, with the monitor's back toward the camera; the nameplate
- * chip is rendered by the kit over the desk's front edge.
+ * The layout is authored on a 20×17 grid (the room's full perimeter), then the
+ * plain grey wall-cap rows/columns are TRIMMED on output (TRIM on top/bottom,
+ * TRIM_X on left/right) so the office sits flush to the page header / screen
+ * edges with no thick grey border. A thin brick divider is drawn by the web app
+ * (CSS) instead. Output world is 18×15 (576×480).
+ *
+ * Visual Iteration 4 layout. Workstations face the viewer: the agent sits
+ * BEHIND its desk (one tile row above it), front-facing, with the monitor's
+ * back toward the camera; the nameplate chip is rendered by the kit over the
+ * desk's front edge.
  *
  * - one shared plank floor (no zone carpets) — desks contrast through dark
  *   espresso wood + light aluminum monitors;
@@ -17,17 +23,12 @@
  *   around the centered door, vent/clock/poster/notice in the gaps;
  * - entrance flanks FLUSH against the wall: vending machine + trash bin
  *   left of the door, trash bin + the big water cooler right of it;
- * - left wing: Analyst / Researcher / Critic at x=2..3, rows 5/9/13
- *   (4-row pitch keeps status badges clear of the next nameplate);
- * - right wing: Builder / Evaluator / Performance Monitor;
- * - center: the Boss behind a deep 4×2 mahogany command console, screen
- *   center, one row above the server room (console = furniture tiles;
- *   `boss-console` object is a pure hit-area);
+ * - left wing: Analyst / Researcher / Critic; right wing: Builder /
+ *   Evaluator / Performance Monitor (4-row pitch keeps badges clear);
+ * - center: the Boss behind a deep 4×2 mahogany command console;
  * - behind the Boss: an executive lounge — two leather sofas facing each
  *   other, framed by big plants (central door walkway kept clear);
- * - below the Boss: a glass-walled infra/server room (tech floor, full
- *   width to the glass walls) with square corners and a sliding glass door,
- *   holding the server rack, archive shelf and bot status monitor;
+ * - below the Boss: a glass-walled infra/server room;
  * - big plants in the four corner seams.
  *
  * Usage: node tools/generate-map.mjs   (run generate-assets.mjs first)
@@ -39,6 +40,13 @@ import { THEMES, TILE_DEFS, TILE_SIZE, TILESET_COLUMNS, tileGid } from './lib/ti
 
 const W = 20;
 const H = 17;
+// The grey wall-cap rows/columns are trimmed on output so the office reads
+// flush on every edge (the side walls are a thin CSS brick divider instead).
+// Object coordinates shift up/left by the trimmed rows/cols to match.
+const TRIM = 1;
+const TRIM_X = 1;
+const H_OUT = H - TRIM * 2;
+const W_OUT = W - TRIM_X * 2;
 
 const THEME_COLORS = {
   day: { background: '#6f7886' },
@@ -67,8 +75,12 @@ function block2x2(layer, x, y, base) {
   set(layer, x + 1, y + 1, `${base}_br`);
 }
 
-function flatten(layer) {
-  return layer.flat();
+/** Trim the perimeter cap rows/columns, then flatten to a row-major array. */
+function flattenTrimmed(layer) {
+  return layer
+    .slice(TRIM, H - TRIM)
+    .map((row) => row.slice(TRIM_X, W - TRIM_X))
+    .flat();
 }
 
 // ---------------------------------------------------------------------------
@@ -100,11 +112,9 @@ for (let y = 13; y <= 15; y++) {
   set(floor, 13, y, 'floor_tech_edge_r');
 }
 
-// walls: full perimeter cap, two face rows along the top wall
-for (let x = 0; x < W; x++) {
-  set(walls, x, 0, 'wall_top');
-  set(walls, x, H - 1, 'wall_top');
-}
+// walls: cap columns (x=0 / x=19) are trimmed on output; two face rows carry
+// the decorated top (back) wall. We still author the side columns so the floor
+// loop boundaries match, but they fall outside the trimmed window.
 for (let y = 0; y < H; y++) {
   set(walls, 0, y, 'wall_top');
   set(walls, W - 1, y, 'wall_top');
@@ -140,13 +150,14 @@ set(furniture, 12, 2, 'water_cooler_bottom');
 // agent seated BEHIND it (one row up, front-facing); nameplate chip lands
 // on the desk front. 4-row pitch — statuses stay clear of neighbours.
 const DESKS = [
-  // [x, deskY, variant]
-  [2, 5, 'desk_a'],
-  [2, 9, 'desk_b'],
-  [2, 13, 'desk_a'],
-  [16, 5, 'desk_b'],
-  [16, 9, 'desk_a'],
-  [16, 13, 'desk_b'],
+  // [x, deskY, variant] — wings pulled one tile toward centre so the bottom
+  // agents sit between the office side wall and the server-room wall.
+  [3, 5, 'desk_a'],
+  [3, 9, 'desk_b'],
+  [3, 13, 'desk_a'],
+  [15, 5, 'desk_b'],
+  [15, 9, 'desk_a'],
+  [15, 13, 'desk_b'],
 ];
 for (const [x, y, base] of DESKS) {
   set(furniture, x, y, `${base}_l`);
@@ -206,8 +217,12 @@ set(furniture, 18, 15, 'plant_big');
 void decor;
 
 // ---------------------------------------------------------------------------
-// object layers (shared geometry)
+// object layers (shared geometry). Object coords are shifted up/left by the
+// trimmed perimeter so they line up with the trimmed tile layers.
 // ---------------------------------------------------------------------------
+
+const Y_SHIFT = TRIM * TILE_SIZE;
+const X_SHIFT = TRIM_X * TILE_SIZE;
 
 function buildObjects() {
   let nextObjectId = 1;
@@ -218,8 +233,8 @@ function buildObjects() {
       name,
       type: 'agent_spawn',
       point: true,
-      x,
-      y,
+      x: x - X_SHIFT,
+      y: y - Y_SHIFT,
       width: 0,
       height: 0,
       rotation: 0,
@@ -237,8 +252,8 @@ function buildObjects() {
       id: nextObjectId++,
       name,
       type: 'interactive_object',
-      x,
-      y,
+      x: x - X_SHIFT,
+      y: y - Y_SHIFT,
       width,
       height,
       rotation: 0,
@@ -260,32 +275,32 @@ function buildObjects() {
       displayName: 'Boss / Orchestrator',
       label: 'Boss',
     }),
-    spawnPoint('analyst', 96, 160, {
+    spawnPoint('analyst', 128, 160, {
       role: 'strategy_analyst',
       displayName: 'Strategy Analyst',
       label: 'Analyst',
     }),
-    spawnPoint('researcher', 96, 288, {
+    spawnPoint('researcher', 128, 288, {
       role: 'researcher',
       displayName: 'Researcher',
       label: 'Researcher',
     }),
-    spawnPoint('critic', 96, 416, {
+    spawnPoint('critic', 128, 416, {
       role: 'critic',
       displayName: 'Critic / Risk Reviewer',
       label: 'Critic',
     }),
-    spawnPoint('builder', 544, 160, {
+    spawnPoint('builder', 512, 160, {
       role: 'builder',
       displayName: 'Builder',
       label: 'Builder',
     }),
-    spawnPoint('evaluator', 544, 288, {
+    spawnPoint('evaluator', 512, 288, {
       role: 'evaluator',
       displayName: 'Evaluator',
       label: 'Evaluator',
     }),
-    spawnPoint('perf-monitor', 544, 416, {
+    spawnPoint('perf-monitor', 512, 416, {
       role: 'performance_monitor',
       displayName: 'Performance Monitor',
       label: 'Monitor',
@@ -346,13 +361,13 @@ function buildMap(theme) {
       id: nextLayerId++,
       name,
       type: 'tilelayer',
-      width: W,
-      height: H,
+      width: W_OUT,
+      height: H_OUT,
       x: 0,
       y: 0,
       opacity: 1,
       visible: true,
-      data: flatten(layer),
+      data: flattenTrimmed(layer),
     };
   }
 
@@ -378,8 +393,8 @@ function buildMap(theme) {
     orientation: 'orthogonal',
     renderorder: 'right-down',
     infinite: false,
-    width: W,
-    height: H,
+    width: W_OUT,
+    height: H_OUT,
     tilewidth: TILE_SIZE,
     tileheight: TILE_SIZE,
     backgroundcolor: colors.background,
@@ -429,5 +444,5 @@ for (const theme of THEMES) {
   console.log(`Wrote ${outFile}`);
 }
 console.log(
-  `  ${W}×${H} tiles @ ${TILE_SIZE}px — ${W * TILE_SIZE}×${H * TILE_SIZE}px world`,
+  `  ${W_OUT}×${H_OUT} tiles @ ${TILE_SIZE}px — ${W_OUT * TILE_SIZE}×${H_OUT * TILE_SIZE}px world`,
 );

@@ -4,20 +4,17 @@ import { useSession } from '../session/SessionContext';
 import { FLOOR_THEMES, type FloorThemeName } from '@trading-office/trading-lab-floor';
 
 const THEME_ORDER: FloorThemeName[] = ['day', 'night'];
+const THEME_ICON: Record<FloorThemeName, string> = { day: '☀', night: '☾' };
 
-// Authed chrome (topbar: theme toggle + simulate toggle + logout), mounted
-// around FloorScreen by App.tsx's FloorRoute.
+// Authed chrome (topbar: icon day/night toggle + logout), mounted around
+// FloorScreen by App.tsx's FloorRoute.
 export function AppShell({
   themeName,
   onThemeChange,
-  simulate,
-  onSimulateChange,
   children,
 }: {
   themeName: FloorThemeName;
   onThemeChange: (t: FloorThemeName) => void;
-  simulate: boolean;
-  onSimulateChange: (v: boolean) => void;
   children: ReactNode;
 }) {
   const { session, logout } = useSession();
@@ -43,20 +40,15 @@ export function AppShell({
                 type="button"
                 className="theme-btn"
                 data-active={name === themeName}
+                aria-pressed={name === themeName}
+                title={FLOOR_THEMES[name].label}
+                aria-label={FLOOR_THEMES[name].label}
                 onClick={() => onThemeChange(name)}
               >
-                {name === 'day' ? '☀' : '☾'} {FLOOR_THEMES[name].label}
+                <span aria-hidden="true">{THEME_ICON[name]}</span>
               </button>
             ))}
           </div>
-          <label className="sim-toggle">
-            <input
-              type="checkbox"
-              checked={simulate}
-              onChange={(e) => onSimulateChange(e.target.checked)}
-            />
-            simulate activity
-          </label>
           <span className="shell__user">{session.user?.name ?? ''}</span>
           <button type="button" className="btn btn--ghost" onClick={handleLogout}>
             Log out

@@ -175,6 +175,7 @@ export class OfficeScene extends EventEmitter<OfficeSceneEventMap> {
         spriteKey: objectConfig?.sprite,
         showLabel: showObjectLabels && objectConfig?.showLabel !== false,
         labelMode: objectLabelMode,
+        worldHeight: map.pixelHeight,
       });
       scene.objectViews.set(object.id, view);
       if (object.interactive) {

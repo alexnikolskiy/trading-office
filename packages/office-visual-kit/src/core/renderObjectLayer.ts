@@ -11,6 +11,14 @@ import type { EntityView, ObjectEntity } from './sceneTypes';
  *   furniture already painted in tile layers.
  */
 
+export interface ObjectViewOptions {
+  spriteKey?: string;
+  showLabel: boolean;
+  labelMode?: 'always' | 'hover';
+  /** World height in px; lets an object near the bottom edge flip its label up. */
+  worldHeight?: number;
+}
+
 export class ObjectView implements EntityView {
   readonly container: Container;
 
@@ -27,11 +35,7 @@ export class ObjectView implements EntityView {
     readonly entity: ObjectEntity,
     private readonly theme: OfficeSceneTheme,
     registry: AssetRegistry,
-    options: {
-      spriteKey?: string;
-      showLabel: boolean;
-      labelMode?: 'always' | 'hover';
-    },
+    options: ObjectViewOptions,
   ) {
     this.labelMode = options.labelMode ?? 'always';
     this.container = new Container();
@@ -78,7 +82,15 @@ export class ObjectView implements EntityView {
 
     if (options.showLabel && entity.label) {
       this.labelChip = createLabelChip(entity.label, theme.objectLabel);
-      this.labelChip.container.position.set(Math.round(width / 2), height + 2);
+      // Default: the chip sits just below the object. If the object is near the
+      // world's bottom edge, flip it ABOVE so the chip isn't clipped off-screen.
+      const worldHeight = options.worldHeight ?? Infinity;
+      const nearBottom = entity.position.y + height > worldHeight - 48;
+      const chipHeight = Math.round(this.labelChip.container.height) || 16;
+      this.labelChip.container.position.set(
+        Math.round(width / 2),
+        nearBottom ? -chipHeight - 2 : height + 2,
+      );
       this.labelChip.container.visible = this.labelMode === 'always';
       this.container.addChild(this.labelChip.container);
     } else {
@@ -124,11 +136,7 @@ export function renderObject(
   entity: ObjectEntity,
   theme: OfficeSceneTheme,
   registry: AssetRegistry,
-  options: {
-    spriteKey?: string;
-    showLabel: boolean;
-    labelMode?: 'always' | 'hover';
-  },
+  options: ObjectViewOptions,
 ): ObjectView {
   return new ObjectView(entity, theme, registry, options);
 }

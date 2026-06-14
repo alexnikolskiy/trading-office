@@ -6,12 +6,13 @@ import type {
 } from '@trading-office/office-visual-kit';
 import { OfficeSceneCanvas } from '@trading-office/office-visual-kit/react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useMatch, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { type FloorThemeName } from '@trading-office/trading-lab-floor';
-import { useGateway, useRuntimeStore, useConnectionStatus } from '../runtime/RuntimeContext';
+import { useRuntimeStore, useConnectionStatus } from '../runtime/RuntimeContext';
 import { applyStatusToScene } from '../runtime/sceneBridge';
 import { INITIAL_STATUSES } from '@trading-office/office-fixtures';
-import { buildFloorConfig, FLOOR_BASE_PATH, panelTargetToObjectId } from './floorConfig';
+import { CityBackdrop } from '../city/CityBackdrop';
+import { buildFloorConfig, panelTargetToObjectId } from './floorConfig';
 import { selectionKey, type RouteSelection } from './floorSelection';
 import {
   opensDock,
@@ -22,16 +23,12 @@ import {
 import { PanelDock } from './PanelDock';
 import { ExitConfirm } from './ExitConfirm';
 
-export function FloorScreen({
-  themeName = 'day',
-  simulate = false,
-}: {
-  themeName?: FloorThemeName;
-  simulate?: boolean;
-}) {
+const NONE = { kind: 'none' } as const;
+const OPERATOR_CHAT = { kind: 'operator-chat' } as const;
+
+export function FloorScreen({ themeName = 'day' }: { themeName?: FloorThemeName }) {
   const navigate = useNavigate();
   const store = useRuntimeStore();
-  const gateway = useGateway();
   const connection = useConnectionStatus();
   const degraded = connection === 'reconnecting' || connection === 'disconnected' || connection === 'error';
 
@@ -45,110 +42,123 @@ export function FloorScreen({
   const [scene, setScene] = useState<OfficeScene | null>(null);
   const reconciling = useRef(false);
   const [error, setError] = useState<Error | null>(null);
+  const floorRef = useRef<HTMLDivElement>(null);
+  const frameRef = useRef<HTMLDivElement>(null);
 
-  // Route → selection
-  const agentMatch = useMatch(`${FLOOR_BASE_PATH}/agent/:agentId`);
-  const panelMatch = useMatch(`${FLOOR_BASE_PATH}/panel/:panelTarget`);
-  const operatorMatch = useMatch(`${FLOOR_BASE_PATH}/operator`);
-  const sel: RouteSelection = {
-    agentId: agentMatch?.params.agentId,
-    panelTarget: panelMatch?.params.panelTarget,
-    operator: !!operatorMatch,
-  };
-  const panelKind = resolvePanel(sel, agentInfos);
-  const selKey = selectionKey(sel);
+  // Dock state is LOCAL UI state, independent of the route and of each other.
+  const [leftSel, setLeftSel] = useState<RouteSelection | null>(null);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [exitOpen, setExitOpen] = useState(false);
 
-  // Intent handlers — ONLY navigate; ignored while reconciling (echo guard).
-  const onAgentClick = useCallback(
-    (agent: AgentEntity) => {
-      if (reconciling.current) return;
-      navigate(`${FLOOR_BASE_PATH}/agent/${agent.id}`);
-    },
-    [navigate],
+  const leftKind = useMemo(
+    () => (leftSel ? resolvePanel(leftSel, agentInfos) : NONE),
+    [leftSel, agentInfos],
   );
-  const onObjectClick = useCallback(
-    (object: ObjectEntity) => {
-      if (reconciling.current) return;
-      if (!object.panelTarget) return;
-      navigate(`${FLOOR_BASE_PATH}/panel/${object.panelTarget}`);
-    },
-    [navigate],
-  );
-  const onEntitySelect = useCallback(
-    (entity: OfficeEntity | null) => {
-      if (reconciling.current) return;
-      if (entity === null) navigate(FLOOR_BASE_PATH);
-    },
-    [navigate],
-  );
+  const leftOpen = opensDock(leftKind);
+  const selKey = leftSel ? selectionKey(leftSel) : 'none';
 
-  // Theme switch remounts the canvas (key={themeName}) → a NEW OfficeScene.
-  // Hold the scene in STATE (not a ref): updating it re-runs the bridge +
-  // reconcile effects against the new instance and tears down the old ones.
+  const onAgentClick = useCallback((agent: AgentEntity) => {
+    if (reconciling.current) return;
+    setLeftSel({ agentId: agent.id });
+  }, []);
+  const onObjectClick = useCallback((object: ObjectEntity) => {
+    if (reconciling.current) return;
+    if (!object.panelTarget) return;
+    if (object.panelTarget === 'exit') {
+      setExitOpen(true);
+      return;
+    }
+    setLeftSel({ panelTarget: object.panelTarget });
+  }, []);
+  const onEntitySelect = useCallback((entity: OfficeEntity | null) => {
+    if (reconciling.current) return;
+    if (entity === null) setLeftSel(null);
+  }, []);
+
   const handleSceneReady = useCallback((next: OfficeScene) => {
     setScene(next);
   }, []);
 
-  // Bridge-seam: store → scene. Re-binds whenever the scene INSTANCE changes
-  // (e.g. after a Day/Night remount); the cleanup unsubscribes the old scene.
   useEffect(() => {
     if (!scene) return;
     return applyStatusToScene(scene, store);
   }, [scene, store]);
 
-  // Reconcile the scene to the route. Depends on the scene INSTANCE, so a
-  // Day/Night remount re-applies the current route selection to the new scene.
-  // The reconciling guard makes the kit's synchronous echo events
-  // (agent:click/object:click/entity:select fired from selectEntity) no-ops,
-  // so route → scene never loops back into navigate.
   useEffect(() => {
     if (!scene) return;
-    const id = selectedEntityId(resolvePanel(sel, agentInfos), targetToObject);
+    const id = selectedEntityId(leftKind, targetToObject);
     reconciling.current = true;
     try {
       scene.selectEntity(id);
-      if (id) scene.focusEntity(id);
     } finally {
       reconciling.current = false;
     }
-    // selKey captures sel; agentInfos/targetToObject are config-stable.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scene, selKey]);
 
-  // Status simulation toggle (topbar). On → gateway pushes statuses into the
-  // store (which the bridge-seam propagates to the scene + panels). Off → reset.
   useEffect(() => {
-    if (!simulate) {
-      store.setStatuses(INITIAL_STATUSES);
-      return;
-    }
-    if (!gateway.subscribeOfficeEvents) return;
-    const off = gateway.subscribeOfficeEvents((e) => store.reduce(e));
-    return off;
-  }, [simulate, gateway, store]);
+    store.setStatuses(INITIAL_STATUSES);
+  }, [store]);
+
+  // The docks fill the side gap exactly (screen edge → office edge), so they
+  // stretch right up to the office. Measure that gap and expose it as a CSS var.
+  useEffect(() => {
+    const floor = floorRef.current;
+    const frame = frameRef.current;
+    if (!floor || !frame) return;
+    const ROWS = 15; // office is 15 tile rows tall (640×480 world)
+    const update = () => {
+      // Snap the office height to a whole number of px per tile row so the
+      // tilemap renders at an INTEGER tile size — a fractional fit scale bleeds
+      // 1px seams between tiles. Costs ≤ a few px (clipped by overflow:hidden).
+      const tilePx = Math.max(1, Math.round(floor.clientHeight / ROWS));
+      frame.style.height = `${tilePx * ROWS}px`;
+      // the side brick divider is half a tile wide (≈ 2× narrower than a full
+      // scene wall column would be).
+      floor.style.setProperty('--wall-w', `${Math.round(tilePx / 2)}px`);
+      const gap = Math.max(0, (floor.clientWidth - frame.clientWidth) / 2);
+      floor.style.setProperty('--side-gap', `${Math.round(gap)}px`);
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(floor);
+    return () => ro.disconnect();
+  }, []);
 
   return (
-    <div className="floor">
-      <div className="floor__canvas">
-        <OfficeSceneCanvas
-          key={themeName}
-          config={config}
-          onSceneReady={handleSceneReady}
-          onSceneError={setError}
-          onAgentClick={onAgentClick}
-          onObjectClick={onObjectClick}
-          onEntitySelect={onEntitySelect}
-        />
+    <div className="floor" data-theme={themeName} ref={floorRef}>
+      <CityBackdrop className="floor__backdrop" mood={themeName} />
+
+      {/* office fills the viewport height (its own side-wall columns separate it
+          from the city); the docks fill the side gaps */}
+      <div className="floor__frame" ref={frameRef}>
+        <div className="floor__canvas">
+          <OfficeSceneCanvas
+            key={themeName}
+            config={config}
+            onSceneReady={handleSceneReady}
+            onSceneError={setError}
+            onAgentClick={onAgentClick}
+            onObjectClick={onObjectClick}
+            onEntitySelect={onEntitySelect}
+          />
+        </div>
       </div>
 
-      <button
-        type="button"
-        className="floor__operator-btn"
-        aria-pressed={!!operatorMatch}
-        onClick={() => navigate(operatorMatch ? FLOOR_BASE_PATH : `${FLOOR_BASE_PATH}/operator`)}
-      >
-        Operator
-      </button>
+      {/* Left dock: agent logs / object inspection. Right dock: chat. Both can
+          be open at once and stretch to the office edge. */}
+      <PanelDock side="left" open={leftOpen} panelKind={leftKind} onClose={() => setLeftSel(null)} />
+      <PanelDock side="right" open={chatOpen} panelKind={OPERATOR_CHAT} onClose={() => setChatOpen(false)} />
+
+      {!chatOpen && (
+        <button type="button" className="floor__chat-btn" onClick={() => setChatOpen(true)}>
+          <svg className="floor__chat-icon" width="15" height="14" viewBox="0 0 10 9" shapeRendering="crispEdges" aria-hidden="true">
+            <rect x="0" y="0" width="10" height="7" fill="currentColor" />
+            <rect x="1" y="7" width="2" height="2" fill="currentColor" />
+          </svg>
+          Open chat
+        </button>
+      )}
 
       {degraded && (
         <div className="floor__conn-warning" role="alert">
@@ -156,17 +166,8 @@ export function FloorScreen({
         </div>
       )}
 
-      <PanelDock
-        open={opensDock(panelKind)}
-        panelKind={panelKind}
-        onClose={() => navigate(FLOOR_BASE_PATH)}
-      />
-
-      {panelKind.kind === 'exit' && (
-        <ExitConfirm
-          onConfirm={() => navigate('/')}
-          onCancel={() => navigate(FLOOR_BASE_PATH)}
-        />
+      {exitOpen && (
+        <ExitConfirm onConfirm={() => navigate('/')} onCancel={() => setExitOpen(false)} />
       )}
 
       {error && (

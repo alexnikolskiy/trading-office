@@ -10,15 +10,9 @@ import type { FloorThemeName } from '@trading-office/trading-lab-floor';
 
 function FloorRoute() {
   const [themeName, setThemeName] = useState<FloorThemeName>('day');
-  const [simulate, setSimulate] = useState(false);
   return (
-    <AppShell
-      themeName={themeName}
-      onThemeChange={setThemeName}
-      simulate={simulate}
-      onSimulateChange={setSimulate}
-    >
-      <FloorScreen themeName={themeName} simulate={simulate} />
+    <AppShell themeName={themeName} onThemeChange={setThemeName}>
+      <FloorScreen themeName={themeName} />
     </AppShell>
   );
 }
