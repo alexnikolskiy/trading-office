@@ -240,12 +240,12 @@ Path: browser `POST /api/office/operator/messages` (`OperatorMessage { text, sou
 | `error` | `operator_message_failed{ error }` |
 | `task_status` — terminal `completed` | `…_completed('Task <taskId> completed')` (no follow) |
 | `task_status` — terminal `failed` / `rejected` | `operator_message_failed{ error }` (no follow) |
-| `task_status` — active `accepted` / `queued` / `running` | `…_progress{ stage:'task_status', note:'status: <status>' }` → reliable-correlationId gate (below) |
+| `task_status` — active `accepted` / `queued` / `running` | `…_completed('Task <taskId> is <status>')` — one informational reply, **NO follower** (a status query reports the current status; downstream following is for `task_created`) |
 | `task_created` | `…_progress{ stage:'task_created', note:'<taskType> · <taskId>' }` → reliable-correlationId gate (below) |
 
 `ChatResponse` is the full discriminated union: `task_created`, `task_status`, `needs_clarification`, `out_of_scope`, `help`, `capability_not_available`, `rejected`, `error` (every variant carries `sessionId`). `task_status.status` is a `TaskStatus` — terminal = `completed | failed | rejected`, active = `accepted | queued | running`.
 
-**Reliable-correlationId gate (shared by `task_created` and active `task_status`):** the `ConversationFollower` (§7.2) starts **only** if a `correlationId` is reliably obtained for the task via explicit-field bootstrap. If none is obtained within the cap, the turn finalizes honestly — current status + "Live task progress is unavailable" — and **never** a heuristic follow based on text or task status alone.
+**Reliable-correlationId gate (`task_created` only):** the `ConversationFollower` (§7.2) is started on `task_created`; it follows **only** if a `correlationId` is reliably obtained via explicit-field bootstrap — otherwise the turn finalizes honestly ("Live task progress is unavailable"), **never** a heuristic follow based on text or task status. Active `task_status` does **not** start a follower (it reports the current status as one informational reply); a chained `task_created` passes `nextTaskType = plannedNextStep.taskType` so the follower advances the original task's terminal (as a progress delta) and awaits the chained task's terminal.
 
 All delta text is human-readable; never raw debug payload.
 
