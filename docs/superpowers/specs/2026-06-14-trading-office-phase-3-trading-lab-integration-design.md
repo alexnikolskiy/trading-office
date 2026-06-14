@@ -238,7 +238,14 @@ Path: browser `POST /api/office/operator/messages` (`OperatorMessage { text, sou
 | `capability_not_available` | `…_delta(message)` → `…_completed` (terminal; no follow) |
 | `rejected` | `operator_message_failed{ error }` |
 | `error` | `operator_message_failed{ error }` |
-| `task_created` | `…_progress{ stage:'task_created', note:'<taskType> · <taskId>' }` → start `ConversationFollower` |
+| `task_status` — terminal `completed` | `…_completed('Task <taskId> completed')` (no follow) |
+| `task_status` — terminal `failed` / `rejected` | `operator_message_failed{ error }` (no follow) |
+| `task_status` — active `accepted` / `queued` / `running` | `…_progress{ stage:'task_status', note:'status: <status>' }` → reliable-correlationId gate (below) |
+| `task_created` | `…_progress{ stage:'task_created', note:'<taskType> · <taskId>' }` → reliable-correlationId gate (below) |
+
+`ChatResponse` is the full discriminated union: `task_created`, `task_status`, `needs_clarification`, `out_of_scope`, `help`, `capability_not_available`, `rejected`, `error` (every variant carries `sessionId`). `task_status.status` is a `TaskStatus` — terminal = `completed | failed | rejected`, active = `accepted | queued | running`.
+
+**Reliable-correlationId gate (shared by `task_created` and active `task_status`):** the `ConversationFollower` (§7.2) starts **only** if a `correlationId` is reliably obtained for the task via explicit-field bootstrap. If none is obtained within the cap, the turn finalizes honestly — current status + "Live task progress is unavailable" — and **never** a heuristic follow based on text or task status alone.
 
 All delta text is human-readable; never raw debug payload.
 
@@ -251,21 +258,23 @@ All delta text is human-readable; never raw debug payload.
 3. **Follow (correlationId obtained):** subscribe to the shared SSE fan-out, filter to `event.correlationId === <convCorrelationId>`. Each correlated, non-noise `agent_event_appended` → `operator_message_delta{ textDelta: event.summary }`.
    - **Noise filter (excluded from deltas):** `chat.intent_*`, `chat.task_created`, `chat.plan.created`, dedupe/reuse/store events (`*.deduped`, `backtest.reused`, `artifact.stored`). **Whitelist:** `*.started|.completed|.failed` of `strategy_analyst`, `research.run_cycle`, `builder`, `backtest`, `evaluation`, plus `hypothesis.validated|rejected`.
    - **`plannedNextStep` chaining:** the correlated subscription already spans the chain (chained task shares the same `correlationId`). `chat.plan.advanced` (correlated) signals a chain step; the chained `taskId` is discovered as a new distinct `taskId` appearing under the same `correlationId` (`nextTaskId` is stripped from the DTO).
-4. **Terminal — correlated events ONLY:**
-   - **Failure:** the first correlated event whose `type` resolves to failed (suffix `failed|rejected|error`) or `chat.plan.advance_failed` → `operator_message_failed{ error:{ code:'task_failed', message: humanized } }`. Reliable because correlated.
-   - **Success:** a correlated event matching the active task's **expected success-terminal type**, with no pending chain advance → `operator_message_completed{ reply }`. Expected terminal derived from `taskType` (calibration table below); switches to the chained task's terminal after `chat.plan.advanced`.
-   - **Never** treat an uncorrelated `agent_status_changed.status==='failed'` (per-agent, possibly another process) as terminal.
+4. **Terminal — correlated events ONLY, matched structurally (never by a hardcoded event name):** a turn terminates only on an event that satisfies ALL of —
+   - explicit **`correlationId`** equal to the conversation's;
+   - **`taskId`** equal to the active task's id or a known chained task id (discovered under the same `correlationId`);
+   - **task-type prefix** consistent with the active task's `taskType`;
+   - **terminal suffix / event type drawn from the *confirmed* trading-lab taxonomy** — failure (`failed | rejected | error`, or `chat.plan.advance_failed`) → `operator_message_failed{ error:{ code:'task_failed', message: humanized } }`; the confirmed *task-completion* type for that prefix → `operator_message_completed{ reply }`.
+   - **Never** terminate from an unrelated agent-level `failed` / `succeeded` (e.g. an uncorrelated `agent_status_changed`), nor from a mid-workflow `*.completed` on a sub-step — only the active task's confirmed completion event counts.
 5. **Guards (honest finalize, never fabricate success):** on `FOLLOW_MAX_MS`, `FOLLOW_IDLE_MS`, or `FOLLOW_MAX_DELTAS` without a clean terminal → `operator_message_completed{ reply: <accumulated real deltas> + ' · live progress stream ended' }` + `system_notice`. We present only what was really observed.
 
-**Expected success-terminal (calibration — the M3 risk point):**
+**`taskType` prefix → terminal event type — PROVISIONAL, confirmed by the calibration step (§13, M1/M3); do NOT hardcode these names into the plan:**
 
-| active `taskType` | success-terminal `type` |
+| active `taskType` (prefix) | provisional terminal type — confirm against the real taxonomy |
 |---|---|
-| `strategy.onboard` / `strategy.analyze_source` | `strategy_analyst.completed` |
-| `research.run_cycle` | `research.run_cycle.completed` |
-| `hypothesis.build` (→ backtest) | `evaluation.completed` |
+| `strategy.onboard` / `strategy.analyze_source` | `strategy_analyst.*` (`completed` / `failed`) |
+| `research.run_cycle` | `research.run_cycle.*` (`completed` / failure) |
+| `hypothesis.build` (→ backtest) | `evaluation.*` / `backtest.*` (`completed` / failure) |
 
-If, during M3 design/tests, this table proves unreliable against real event streams, **M3 degrades** (§13): deltas + guard-timeout-completed only (no asserted success terminal), or fully to honest `task_created` + "live progress unavailable". No heuristic/text-based progress is ever introduced.
+The prefix→terminal map is sourced from trading-lab's **real event taxonomy** during calibration — explicit `correlationId` + known `taskId`/chained `taskId` + expected task prefix + confirmed terminal suffix, never an unrelated agent-level status. **If a task type's exact task-completion event cannot be confirmed, the follower degrades honestly:** it still streams correlated deltas but finalizes via guard timeout with *"Live task progress is unavailable / terminal status could not be confirmed"* — it does **not** assert or guess success. No heuristic or text-based progress is ever introduced.
 
 ---
 
@@ -354,9 +363,9 @@ apps/web/src/...                              # BacktestsPanel '—'; Knowledge/
 
 ## 13. Milestones
 
-- **M1 — reads:** config + mode switch + `TradingLabHttpClient` + `TradingLabReadConnector` + `labDtos` + `mappers` + `CompositeOfficeReadConnector` (reads) + `BacktestSummary` widening + web `—`/gap empty-states + tests.
+- **M1 — reads + calibration #1:** config + mode switch + `TradingLabHttpClient` + `TradingLabReadConnector` + `labDtos` + `mappers` + `CompositeOfficeReadConnector` (reads) + `BacktestSummary` widening + web `—`/gap empty-states + tests. **Calibration pass #1:** inspect real trading-lab event types / tests / sample payloads — confirm the `winRate` unit (drop `×100` if the payload is already a percent) and gather the candidate task-completion event prefixes/suffixes per supported `taskType` (feeds §7.2).
 - **M2 — live:** `TradingLabStreamBridge` (SSE → WS, resume, degradation) + integration test + snapshot re-sync.
-- **M3 — chat follow-downstream (RISK-HEAVY):** `TradingLabChatConnector` + `TradingLabOperatorResponder` + `ConversationFollower` + `summaryFilter` + tests/integration. **Acceptance includes a degradation gate:** if correlation/terminal detection against real trading-lab events proves insufficiently reliable, M3 ships the honest fallback (`task_created` + "live progress unavailable", or deltas + guard-completed) rather than any heuristic progress.
+- **M3 — chat follow-downstream (RISK-HEAVY):** `TradingLabChatConnector` + `TradingLabOperatorResponder` + `ConversationFollower` + `summaryFilter` + tests/integration; handles `task_created` **and** `task_status` (§7.1). **Calibration gate:** confirm, per supported `taskType`, the exact task-completion event (prefix + terminal suffix) that marks the *task* done — distinct from a mid-workflow `*.completed` — against real trading-lab event types/tests/sample payloads. **If a task type's terminal cannot be confirmed, the follower degrades honestly** (correlated deltas + guard-completed / "terminal status could not be confirmed"); an unreliable-overall result degrades to honest `task_created`/`task_status` + "live progress unavailable" — **never** heuristic/guessed progress.
 - **M4 — finish:** `InfraAggregator` + `InfraStatus.sources` + web infra/gap polish + conformance (`mock == connected` fixture) + import-boundary/exposure guards + local trading-lab smoke.
 
 M3 may ship independently after M1–M2 if needed.
