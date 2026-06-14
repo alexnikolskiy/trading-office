@@ -5,6 +5,9 @@ import { loadConfig } from './config';
 import { createTradingLabWiring } from './connector/createTradingLabWiring';
 import { FixtureOfficeReadConnector } from './connector/FixtureOfficeReadConnector';
 import { OfficeEventBus } from './events/OfficeEventBus';
+import { TradingLabChatConnector } from './operator/TradingLabChatConnector';
+import { makeTradingLabOperatorResponder, makeChatUnavailableResponder } from './operator/TradingLabOperatorResponder';
+import type { OperatorResponder } from './operator/TradingLabOperatorResponder';
 
 const nowIso = (): string => new Date().toISOString();
 
@@ -18,7 +21,21 @@ const heartbeat = setInterval(() => {
   bus.publish(e);
 }, config.heartbeatMs);
 
-const { app, injectWebSocket } = createOfficeApp({ connector, bus, config });
+let operatorResponder: OperatorResponder | undefined;
+if (wiring) {
+  if (config.tradingLab.chatToken) {
+    const chat = new TradingLabChatConnector({
+      chatUrl: config.tradingLab.chatUrl,
+      chatToken: config.tradingLab.chatToken,
+      requestTimeoutMs: config.tradingLab.requestTimeoutMs,
+    });
+    operatorResponder = makeTradingLabOperatorResponder({ chat, client: wiring.client, bridge: wiring.bridge, guards: config.chatFollow });
+  } else {
+    operatorResponder = makeChatUnavailableResponder();
+  }
+}
+
+const { app, injectWebSocket } = createOfficeApp({ connector, bus, config, operatorResponder });
 const server = serve({ fetch: app.fetch, port: config.port }, (info) => {
   console.log(`office server listening on :${info.port}`);
 });
