@@ -239,8 +239,14 @@ export function createTradingLabResearchFloorScene(
     ],
 
     camera: {
+      // The office page frames the floor at its native aspect ratio and fills
+      // the viewport height; the scene is a static, fully-fit view (no zoom, no
+      // pan). fitPadding stays 0 — a negative value zooms in but pushes the
+      // tilemap to a non-integer scale that reveals tile seams.
       defaultZoom: 'fit',
-      fitPadding: 16,
+      fitPadding: 0,
+      enableZoom: false,
+      enablePan: false,
       minZoom: 0.5,
       maxZoom: 6,
     },

@@ -49,16 +49,22 @@ function panelContentKey(panelKind: PanelKind): string {
 
 export function PanelDock({
   open,
+  side,
   panelKind,
   onClose,
 }: {
   open: boolean;
+  side: 'left' | 'right';
   panelKind: PanelKind;
   onClose: () => void;
 }) {
   return (
-    <aside className="dock" data-open={open} aria-hidden={!open}>
-      {open && <div key={panelContentKey(panelKind)} className="dock__content">{renderPanel(panelKind, onClose)}</div>}
+    <aside className="dock" data-side={side} data-open={open} aria-hidden={!open}>
+      {open && (
+        <div key={panelContentKey(panelKind)} className="dock__content">
+          {renderPanel(panelKind, onClose)}
+        </div>
+      )}
     </aside>
   );
 }

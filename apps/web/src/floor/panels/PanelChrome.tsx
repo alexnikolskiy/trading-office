@@ -5,11 +5,14 @@ export function PanelChrome({
   badge,
   onClose,
   children,
+  flush = false,
 }: {
   title: string;
   badge?: string;
   onClose: () => void;
   children: ReactNode;
+  /** Drop the body's padding/scroll so a panel (e.g. chat) can own its layout. */
+  flush?: boolean;
 }) {
   return (
     <section className="panel">
@@ -20,7 +23,7 @@ export function PanelChrome({
           ×
         </button>
       </header>
-      <div className="panel__body">{children}</div>
+      <div className={`panel__body${flush ? ' panel__body--flush' : ''}`}>{children}</div>
     </section>
   );
 }

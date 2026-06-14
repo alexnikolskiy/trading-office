@@ -50,7 +50,7 @@ export function selectedEntityId(
   }
 }
 
-/** Panel kinds that occupy the right dock (exit/none never open the dock). */
+/** Panel kinds that occupy a side dock (exit/none never open a dock). */
 export function opensDock(kind: PanelKind): boolean {
   return (
     kind.kind === 'operator-chat' ||
