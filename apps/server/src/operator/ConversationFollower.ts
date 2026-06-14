@@ -53,6 +53,9 @@ export class ConversationFollower {
     await this.follow(correlationId);
   }
 
+  // Liveness: each getAgentEvents poll is bounded by TradingLabHttpClient's per-request timeout
+  // (requestTimeoutMs) — a hung upstream aborts and we retry, so bootstrap cannot hang forever.
+  // After bootstrapRetries without a correlationId we degrade honestly (run() → "unavailable").
   private async bootstrap(): Promise<string | undefined> {
     for (let i = 0; i < this.deps.guards.bootstrapRetries && !this.done; i++) {
       try {

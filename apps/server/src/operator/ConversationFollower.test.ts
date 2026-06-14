@@ -120,4 +120,42 @@ describe('ConversationFollower', () => {
     const completed = out.find((e) => e.type === 'operator_message_completed') as Extract<OfficeEvent, { type: 'operator_message_completed' }>;
     expect(completed.reply.text).toMatch(/live progress stream ended/);
   });
+
+  it('maxDeltas cutoff finalizes honestly after N deltas', async () => {
+    const bridge = fakeBridge();
+    const out: OfficeEvent[] = [];
+    const f = new ConversationFollower({
+      ids, taskId: 't1', taskType: 'research.run_cycle', emit: (e) => out.push(e),
+      client: clientWith([ev({ type: 'research.run_cycle.started', correlationId: 'corr1' })]) as never,
+      bridge: bridge as never, guards: { ...guards, maxDeltas: 2 }, now: NOW, sleep: async () => {}, schedule: noSchedule,
+    });
+    const p = f.run();
+    await tick();
+    bridge.push(ev({ type: 'hypothesis.validated', correlationId: 'corr1', summary: 'A' }));
+    bridge.push(ev({ type: 'hypothesis.validated', correlationId: 'corr1', summary: 'B' })); // 2nd → maxDeltas cutoff
+    await p;
+    const deltas = out.filter((e) => e.type === 'operator_message_delta');
+    expect(deltas).toHaveLength(2);
+    const completed = out.find((e) => e.type === 'operator_message_completed') as Extract<OfficeEvent, { type: 'operator_message_completed' }>;
+    expect(completed.reply.text).toMatch(/live progress stream ended/);
+  });
+
+  it('maxMs guard finalizes honestly without asserting success', async () => {
+    const bridge = fakeBridge();
+    const timers: Array<{ ms: number; cb: () => void }> = [];
+    const schedule = (ms: number, cb: () => void) => { const t = { ms, cb }; timers.push(t); return () => { const i = timers.indexOf(t); if (i >= 0) timers.splice(i, 1); }; };
+    const out: OfficeEvent[] = [];
+    const f = new ConversationFollower({
+      ids, taskId: 't1', taskType: 'research.run_cycle', emit: (e) => out.push(e),
+      client: clientWith([ev({ type: 'research.run_cycle.started', correlationId: 'corr1' })]) as never,
+      bridge: bridge as never, guards: { ...guards, maxMs: 100, idleMs: 9999 }, now: NOW, sleep: async () => {}, schedule,
+    });
+    const p = f.run();
+    await tick();
+    timers.find((t) => t.ms === 100)!.cb(); // fire max-duration guard
+    await p;
+    const completed = out.find((e) => e.type === 'operator_message_completed') as Extract<OfficeEvent, { type: 'operator_message_completed' }>;
+    expect(completed.reply.text).toMatch(/live progress stream ended/);
+    expect(out.some((e) => e.type === 'operator_message_failed')).toBe(false);
+  });
 });
