@@ -21,6 +21,13 @@ export interface StreamConfig {
   reconnectMaxMs: number;
 }
 
+export interface PlatformConfig {
+  enabled: boolean;
+  readUrl: string;
+  readToken: string;
+  requestTimeoutMs: number;
+}
+
 export interface OfficeServerConfig {
   port: number;
   corsOrigin: string;
@@ -31,6 +38,7 @@ export interface OfficeServerConfig {
   tradingLab: TradingLabConfig;
   chatFollow: ChatFollowConfig;
   stream: StreamConfig;
+  platform: PlatformConfig;
 }
 
 const num = (env: NodeJS.ProcessEnv, key: string, def: number): number => {
@@ -63,6 +71,19 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): OfficeServerCo
     );
   }
 
+  const platformEnabled = env.OFFICE_PLATFORM_ENABLED === 'true' && connectorMode === 'trading-lab';
+  const platform: PlatformConfig = {
+    enabled: platformEnabled,
+    readUrl: str(env, 'TRADING_PLATFORM_READ_URL', 'http://localhost:8839'),
+    readToken: str(env, 'TRADING_PLATFORM_READ_TOKEN', ''),
+    requestTimeoutMs: num(env, 'TRADING_PLATFORM_REQUEST_TIMEOUT_MS', 10000),
+  };
+  if (platformEnabled && (!env.TRADING_PLATFORM_READ_URL || !env.TRADING_PLATFORM_READ_TOKEN)) {
+    throw new Error(
+      'OFFICE_PLATFORM_ENABLED=true (trading-lab mode) requires TRADING_PLATFORM_READ_URL and TRADING_PLATFORM_READ_TOKEN',
+    );
+  }
+
   return {
     port: num(env, 'OFFICE_SERVER_PORT', 8787),
     corsOrigin: str(env, 'OFFICE_CORS_ORIGIN', 'http://localhost:5174'),
@@ -82,5 +103,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): OfficeServerCo
       reconnectBaseMs: num(env, 'OFFICE_STREAM_RECONNECT_BASE_MS', 1000),
       reconnectMaxMs: num(env, 'OFFICE_STREAM_RECONNECT_MAX_MS', 30000),
     },
+    platform,
   };
 }
