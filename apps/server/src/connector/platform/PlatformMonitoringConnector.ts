@@ -1,6 +1,14 @@
-import type { BotHealth, InfraService, InfraSource } from '@trading-office/office-gateway';
+import type { BotHealth, InfraService, InfraSource, InfraSourceState } from '@trading-office/office-gateway';
 import type { PlatformHttpClient } from './PlatformHttpClient';
-import { mapRun } from './mappers';
+import { mapRun, mapRuntimeCollection, mapMarket, mapExecution, mapCoverage } from './mappers';
+
+type Attempt<T> = { ok: true; value: T } | { ok: false; error: unknown };
+async function attempt<T>(fn: () => Promise<T>): Promise<Attempt<T>> {
+  try { return { ok: true, value: await fn() }; } catch (error) { return { ok: false, error }; }
+}
+function aspectState<T>(a: Attempt<T>, map: (v: T) => InfraSourceState): InfraSourceState {
+  return a.ok ? map(a.value) : 'error';
+}
 
 export interface PlatformInfra {
   services: InfraService[];
@@ -28,14 +36,28 @@ export class PlatformMonitoringConnector {
   }
 
   async getPlatformInfra(): Promise<PlatformInfra> {
-    const sources: InfraSource[] = [];
-    try {
-      await this.client.getRuns('live'); // reachability probe
-      sources.push({ domain: 'bot-health', state: 'live', detail: 'platform ops read' });
-    } catch (err) {
-      sources.push({ domain: 'bot-health', state: 'error', detail: officeMessage(err) });
-    }
-    return { services: [], sources };
+    const [runs, runtime, market, execution, coverage, discover] = await Promise.all([
+      attempt(() => this.client.getRuns('live')),
+      attempt(() => this.client.getRuntimeHealth()),
+      attempt(() => this.client.getMarketHealth()),
+      attempt(() => this.client.getExecutionHealth()),
+      attempt(() => this.client.getCoverage()),
+      attempt(() => this.client.getDiscover()),
+    ]);
+    const anyOtherOk = [runs, runtime, market, execution, coverage].some((a) => a.ok);
+    const opsApiState: InfraSourceState = discover.ok ? 'live' : anyOtherOk ? 'degraded' : 'error';
+    const services: InfraService[] = [
+      { name: 'platform-ops-api', up: discover.ok, detail: discover.ok ? 'reachable' : officeMessage(discover.error) },
+    ];
+    const sources: InfraSource[] = [
+      { domain: 'platform-ops-api', state: opsApiState, detail: `ops read ${opsApiState}` },
+      { domain: 'platform-runtime', state: aspectState(runtime, mapRuntimeCollection), detail: 'runtime health' },
+      { domain: 'platform-market', state: aspectState(market, mapMarket), detail: 'market health' },
+      { domain: 'platform-execution', state: aspectState(execution, mapExecution), detail: 'execution activity' },
+      { domain: 'platform-coverage', state: aspectState(coverage, mapCoverage), detail: 'feed coverage' },
+      { domain: 'bot-health', state: runs.ok ? 'live' : 'error', detail: runs.ok ? 'platform ops read' : officeMessage(runs.error) },
+    ];
+    return { services, sources };
   }
 }
 
