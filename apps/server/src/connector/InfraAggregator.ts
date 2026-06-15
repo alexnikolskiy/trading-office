@@ -1,5 +1,6 @@
 import type { InfraStatus, InfraSource, InfraSourceState } from '@trading-office/office-gateway';
 import type { TradingLabHttpClient } from './tradinglab/TradingLabHttpClient';
+import type { LabReadSourceState } from './tradinglab/labReadSource';
 import type { PlatformInfra } from './platform/PlatformMonitoringConnector';
 
 type ReadyzClient = Pick<TradingLabHttpClient, 'getReadyz' | 'getAuthz'>;
@@ -16,6 +17,10 @@ export class InfraAggregator {
     private readonly streamState: () => StreamState,
     private readonly now: () => string = () => new Date().toISOString(),
     private readonly platformInfra?: () => Promise<PlatformInfra>,
+    // Last outcome of the lab DATA reads (agents/hypotheses/backtests). Distinct
+    // from the auth-aware `trading-lab-read-api` HEALTH probe above: a data read
+    // can be degraded (e.g. timeout/5xx) while /readyz + /v1/authz still pass.
+    private readonly labReadSource?: () => LabReadSourceState,
   ) {}
 
   async getInfraStatus(): Promise<InfraStatus> {
@@ -61,6 +66,11 @@ export class InfraAggregator {
       { domain: 'trading-lab-read-api', state: readApi, detail: readDetail },
       { domain: 'trading-lab-stream', state: stream, detail: `stream ${stream}` },
     ];
+    if (this.labReadSource) {
+      // detail carries the stable reasonCode (token-free) when degraded/error.
+      const ds = this.labReadSource();
+      sources.push({ domain: 'trading-lab-read', state: ds.state, detail: ds.reasonCode ?? 'reachable' });
+    }
     sources.push({ domain: 'knowledge', state: 'gap', detail: 'Knowledge source is not connected yet' });
     if (this.platformInfra) {
       const p = await this.platformInfra().catch((): PlatformInfra => ({ services: [], sources: [{ domain: 'bot-health', state: 'error', detail: 'platform infra unavailable' }] }));

@@ -56,4 +56,23 @@ describe('TradingLabHttpClient', () => {
     const [, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
     expect((init.headers as Record<string, string>).Authorization).toBeUndefined();
   });
+
+  it('attaches a granular office.reason while keeping office.code stable', async () => {
+    const c503 = new TradingLabHttpClient({ ...cfg, fetchImpl: vi.fn(async () => new Response('x', { status: 503 })) });
+    await expect(c503.getBacktests()).rejects.toMatchObject({ office: { code: 'upstream_unavailable', reason: 'upstream_5xx' } });
+    const c403 = new TradingLabHttpClient({ ...cfg, fetchImpl: vi.fn(async () => new Response('{}', { status: 403 })) });
+    await expect(c403.getBacktests()).rejects.toMatchObject({ office: { code: 'upstream_unauthorized', reason: 'auth_failed' } });
+  });
+
+  it('network throw → reason upstream_unreachable; AbortError → reason upstream_timeout', async () => {
+    const net = new TradingLabHttpClient({ ...cfg, fetchImpl: vi.fn(async () => { throw new Error('ECONNREFUSED'); }) });
+    await expect(net.getAgents()).rejects.toMatchObject({ office: { reason: 'upstream_unreachable' } });
+    const to = new TradingLabHttpClient({ ...cfg, fetchImpl: vi.fn(async () => { throw Object.assign(new Error('aborted'), { name: 'AbortError' }); }) });
+    await expect(to.getAgents()).rejects.toMatchObject({ office: { reason: 'upstream_timeout' } });
+  });
+
+  it('non-JSON 200 body → reason upstream_bad_response', async () => {
+    const c = new TradingLabHttpClient({ ...cfg, fetchImpl: vi.fn(async () => new Response('<<not json>>', { status: 200, headers: { 'content-type': 'application/json' } })) });
+    await expect(c.getHypotheses()).rejects.toMatchObject({ office: { reason: 'upstream_bad_response' } });
+  });
 });

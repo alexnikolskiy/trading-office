@@ -58,6 +58,7 @@ export const infraServiceSchema = z.object({ name: z.string(), up: z.boolean(), 
 export const infraSourceDomainSchema = z.enum([
   'office-server',
   'trading-lab-read-api',
+  'trading-lab-read',
   'trading-lab-stream',
   'knowledge',
   'bot-health',
