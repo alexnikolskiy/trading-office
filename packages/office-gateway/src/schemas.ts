@@ -61,6 +61,11 @@ export const infraSourceDomainSchema = z.enum([
   'trading-lab-stream',
   'knowledge',
   'bot-health',
+  'platform-ops-api',
+  'platform-runtime',
+  'platform-market',
+  'platform-execution',
+  'platform-coverage',
 ]);
 export const infraSourceStateSchema = z.enum(['live', 'degraded', 'error', 'gap', 'fixture']);
 export const infraSourceSchema = z.object({
