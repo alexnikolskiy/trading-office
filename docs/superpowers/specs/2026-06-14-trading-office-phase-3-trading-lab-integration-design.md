@@ -180,7 +180,7 @@ Implements `OfficeReadConnector`. Routing in `trading-lab` mode:
 
 `getInfraStatus()` returns the existing `InfraStatus` shape plus the new `sources` map (§8). `InfraAggregator`:
 
-- `services`: office-server (always up) + trading-lab read API (`GET /healthz`/`/readyz` → up/degraded) + trading-lab stream (live/degraded/error from the bridge's state).
+- `services`: office-server (always up) + trading-lab read API (process/db readiness **and** read-credential readiness — see below) + trading-lab stream (live/degraded/error from the bridge's state).
 - `queues`: `[]` — no reliable source (trading-lab queue depth is not on the Read API). Not synthesized.
 - `lastSync`: timestamp of the last successful read/health probe.
 - `sources` (honest source map):
@@ -188,12 +188,17 @@ Implements `OfficeReadConnector`. Routing in `trading-lab` mode:
 | domain | state values | Phase 3 |
 |---|---|---|
 | `office-server` | `live` | `live` |
-| `trading-lab-read-api` | `live` \| `error` | from healthz/readyz + last read outcome |
+| `trading-lab-read-api` | `live` \| `degraded` \| `error` | from `/readyz` (process/db) **then** an authenticated `/v1/authz` probe (credentials) |
 | `trading-lab-stream` | `live` \| `degraded` \| `error` | from `TradingLabStreamBridge` |
 | `knowledge` | `gap` | `gap` |
 | `bot-health` | `gap` | `gap` |
 
 In `fixture` mode the aggregator reports all domains as `fixture`/`live` so no gap markers show.
+
+**Read-api state (credential-aware, follow-up fix).** `/readyz` is open and reports only process/db readiness — it cannot tell whether the office's read token is valid. So the aggregator probes in two steps with the **same token/config** it uses for real reads:
+
+1. `GET /readyz` (no token). Throws/unreachable → `error`; `status:'degraded'` (db down) → `degraded`. Credentials are not consulted in this branch.
+2. If `/readyz` is `ok`, `GET /v1/authz` (auth-gated, sends `Authorization: Bearer <read token>`). `200` → `live` (`detail: ok`); `401/403` (`upstream_unauthorized`) → **`degraded`** with `detail: auth_failed` (never `live` — a real `/v1/*` read would 401); any other failure → `error` (`unreachable`). Only safe reason codes reach `detail`; the token is never logged or placed in the snapshot.
 
 ---
 
@@ -305,7 +310,7 @@ Additive, honesty-driven; all via zod schemas in `packages/office-gateway/src/sc
 | failure | behavior (trading-lab mode) |
 |---|---|
 | Read 5xx/network/timeout | route returns office error body (`upstream_unavailable`); web shows error/empty + existing connection banner; **no fixture swap** |
-| Read 401/403 | `upstream_unauthorized`; `sources['trading-lab-read-api']='error'` |
+| Read 401/403 | `upstream_unauthorized`; data routes return the office error body. Health: the `/v1/authz` credential probe drives `sources['trading-lab-read-api']='degraded'` (`detail: auth_failed`) — visibly not `live`, distinct from `error` (unreachable). |
 | `/v1/stream` down | HTTP reads keep working; `system_notice` + `sources['trading-lab-stream']` degraded/error; backoff reconnect + resume; fresh snapshot on restore |
 | Chat ingress unset/down | `operator_message_failed` + one-time `system_notice('chat ingress not configured')`; reads unaffected |
 | correlationId not found | honest `…_completed('live progress unavailable')`; no fake progress |

@@ -94,3 +94,5 @@ export type LabChatResponse =
 
 export interface LabHealth { status: 'ok' }
 export interface LabReady { status: 'ok' | 'degraded'; checks: { db: boolean } }
+// Credential probe (GET /v1/authz) — auth-gated, so a 200 confirms the read token is accepted.
+export interface LabAuthz { status: 'ok' }

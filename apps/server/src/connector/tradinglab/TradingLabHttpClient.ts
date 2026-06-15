@@ -1,6 +1,6 @@
 import type {
   LabAgentSummary, LabAgentActivity, LabAgentEvent, LabHypothesisListItem, LabBacktest,
-  LabCursorEnvelope, LabPageEnvelope, LabHealth, LabReady,
+  LabCursorEnvelope, LabPageEnvelope, LabHealth, LabReady, LabAuthz,
 } from './labDtos';
 
 export interface OfficeUpstreamError extends Error {
@@ -46,6 +46,11 @@ export class TradingLabHttpClient {
   }
   getReadyz(): Promise<LabReady> {
     return this.getJson('/readyz', false);
+  }
+  // Credential-gated probe: sends the read token (auth=true). A 401 → upstream_unauthorized,
+  // letting callers tell "token rejected" apart from "process not ready" (open /readyz).
+  getAuthz(): Promise<LabAuthz> {
+    return this.getJson('/v1/authz', true);
   }
 
   private async getJson<T>(path: string, auth: boolean): Promise<T> {

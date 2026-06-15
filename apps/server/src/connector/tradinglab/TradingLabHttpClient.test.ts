@@ -34,6 +34,21 @@ describe('TradingLabHttpClient', () => {
     await expect(client.getAgents()).rejects.toMatchObject({ office: { code: 'upstream_unavailable' } });
   });
 
+  it('sends Authorization: Bearer <read token> to the /v1/authz credential probe', async () => {
+    const fetchImpl = vi.fn(async () => ok({ status: 'ok' }));
+    const client = new TradingLabHttpClient({ ...cfg, fetchImpl });
+    await expect(client.getAuthz()).resolves.toEqual({ status: 'ok' });
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(String(url)).toBe('http://lab:3100/v1/authz');
+    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer secret');
+  });
+
+  it('maps a 401 from /v1/authz to upstream_unauthorized (wrong read token)', async () => {
+    const fetchImpl = vi.fn(async () => new Response('{}', { status: 401 }));
+    const client = new TradingLabHttpClient({ ...cfg, fetchImpl });
+    await expect(client.getAuthz()).rejects.toMatchObject({ office: { code: 'upstream_unauthorized' } });
+  });
+
   it('does not send the read token to healthz (public)', async () => {
     const fetchImpl = vi.fn(async () => ok({ status: 'ok' }));
     const client = new TradingLabHttpClient({ ...cfg, fetchImpl });
