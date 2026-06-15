@@ -2,15 +2,25 @@ import type {
   LabAgentSummary, LabAgentActivity, LabAgentEvent, LabHypothesisListItem, LabBacktest,
   LabCursorEnvelope, LabPageEnvelope, LabHealth, LabReady, LabAuthz,
 } from './labDtos';
+import type { LabReadReasonCode } from './labReadSource';
 
 export interface OfficeUpstreamError extends Error {
-  office: { code: 'upstream_unavailable' | 'upstream_unauthorized' | 'upstream_bad_request'; message: string };
+  office: {
+    code: 'upstream_unavailable' | 'upstream_unauthorized' | 'upstream_bad_request';
+    message: string;
+    /**
+     * Granular, operator-facing failure taxonomy. `code` stays coarse so the
+     * auth-aware health probe (InfraAggregator) keeps keying off it unchanged.
+     */
+    reason?: LabReadReasonCode;
+  };
 }
 
 const upstream = (
   code: OfficeUpstreamError['office']['code'],
   message: string,
-): OfficeUpstreamError => Object.assign(new Error(message), { office: { code, message } }) as OfficeUpstreamError;
+  reason?: LabReadReasonCode,
+): OfficeUpstreamError => Object.assign(new Error(message), { office: { code, message, reason } }) as OfficeUpstreamError;
 
 export interface TradingLabHttpClientDeps {
   readUrl: string;
@@ -62,19 +72,31 @@ export class TradingLabHttpClient {
     try {
       res = await this.fetchImpl(`${this.deps.readUrl}${path}`, { headers, signal: ctrl.signal });
     } catch (e) {
-      throw upstream('upstream_unavailable', `trading-lab read request failed: ${(e as Error).message}`);
+      // Client timeout aborts the fetch with an AbortError; anything else is a
+      // connect/DNS failure. We classify on the error shape, not its text, and
+      // never surface the raw message to the operator.
+      const timedOut = (e as Error)?.name === 'AbortError';
+      throw upstream(
+        'upstream_unavailable',
+        `trading-lab read request failed: ${(e as Error).message}`,
+        timedOut ? 'upstream_timeout' : 'upstream_unreachable',
+      );
     } finally {
       clearTimeout(timer);
     }
     if (res.status === 401 || res.status === 403) {
-      throw upstream('upstream_unauthorized', `trading-lab read returned ${res.status}`);
+      throw upstream('upstream_unauthorized', `trading-lab read returned ${res.status}`, 'auth_failed');
     }
     if (res.status >= 500) {
-      throw upstream('upstream_unavailable', `trading-lab read returned ${res.status}`);
+      throw upstream('upstream_unavailable', `trading-lab read returned ${res.status}`, 'upstream_5xx');
     }
     if (res.status >= 400) {
-      throw upstream('upstream_bad_request', `trading-lab read returned ${res.status}`);
+      throw upstream('upstream_bad_request', `trading-lab read returned ${res.status}`, 'upstream_error');
     }
-    return (await res.json()) as T;
+    try {
+      return (await res.json()) as T;
+    } catch {
+      throw upstream('upstream_unavailable', 'trading-lab read returned a malformed response', 'upstream_bad_response');
+    }
   }
 }

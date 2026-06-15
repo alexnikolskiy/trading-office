@@ -67,6 +67,19 @@ export function createOfficeApp(deps: OfficeAppDeps) {
     }),
   );
 
+  // Aggregate endpoints already degrade to an empty projection inside the
+  // connector; this is the safety net for the strict detail/proxy endpoint
+  // (agent activity) and any other uncaught upstream read error — it must be a
+  // TYPED status, never a generic 500. Body is safe + static: no token, URL, or
+  // stack trace, just the stable reason code.
+  app.onError((err, c) => {
+    const office = (err as { office?: { code?: string; reason?: string } }).office;
+    if (!office) return c.json({ error: { code: 'internal_error', message: 'internal error' } }, 500);
+    const reason = office.reason ?? office.code ?? 'upstream_error';
+    const authFailed = reason === 'auth_failed' || office.code === 'upstream_unauthorized';
+    return c.json({ error: { code: reason, message: 'upstream read unavailable' } }, authFailed ? 401 : 502);
+  });
+
   return { app, injectWebSocket };
 }
 

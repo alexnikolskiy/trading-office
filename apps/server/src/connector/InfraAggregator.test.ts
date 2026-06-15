@@ -75,4 +75,27 @@ describe('InfraAggregator', () => {
     expect(d['trading-lab-read-api']).toBe('error');
     expect(d['trading-lab-stream']).toBe('error');
   });
+
+  it('surfaces the lab DATA read source (trading-lab-read) from the tracker; health probe stays independent', async () => {
+    const client = {
+      getReadyz: async () => ({ status: 'ok' as const, checks: { db: true } }),
+      getAuthz: async () => ({ status: 'ok' as const }),
+    };
+    const labReadSource = () => ({ state: 'error' as const, reasonCode: 'upstream_timeout' as const, message: 'trading-lab read timed out' });
+    const infra = await new InfraAggregator(client, () => 'live', NOW, undefined, labReadSource).getInfraStatus();
+    const src = infra.sources!.find((s) => s.domain === 'trading-lab-read')!;
+    expect(src.state).toBe('error');
+    expect(src.detail).toBe('upstream_timeout'); // stable reasonCode in detail, token-free
+    // The auth-aware read-api HEALTH source is independent and unchanged.
+    expect(byDomain(infra)['trading-lab-read-api']).toBe('live');
+  });
+
+  it('omits trading-lab-read entirely when no data source is wired (back-compat)', async () => {
+    const client = {
+      getReadyz: async () => ({ status: 'ok' as const, checks: { db: true } }),
+      getAuthz: async () => ({ status: 'ok' as const }),
+    };
+    const infra = await new InfraAggregator(client, () => 'live', NOW).getInfraStatus();
+    expect(infra.sources!.find((s) => s.domain === 'trading-lab-read')).toBeUndefined();
+  });
 });

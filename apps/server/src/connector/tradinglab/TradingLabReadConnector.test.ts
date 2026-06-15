@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { TradingLabHttpClient } from './TradingLabHttpClient';
 import { TradingLabReadConnector } from './TradingLabReadConnector';
+import { LabReadSourceTracker } from './labReadSource';
 
 const json = (b: unknown) => new Response(JSON.stringify(b), { status: 200, headers: { 'content-type': 'application/json' } });
 const cfg = { readUrl: 'http://lab:3100', readToken: 't', requestTimeoutMs: 1000 };
@@ -49,5 +50,63 @@ describe('TradingLabReadConnector', () => {
       expect(a).toEqual({ agentId: id, status: 'idle', currentTask: null, logs: [{ ts: 'T', level: 'info', text: 'No trading-lab source connected yet' }] });
     }
     expect(fetchImpl).not.toHaveBeenCalled();
+  });
+});
+
+describe('TradingLabReadConnector — graceful degradation (no throw on upstream lab failure)', () => {
+  const status = (s: number, body = '{}') => new Response(body, { status: s });
+  const withTracker = (fetchImpl: typeof fetch) => {
+    const tracker = new LabReadSourceTracker();
+    const c = new TradingLabReadConnector(new TradingLabHttpClient({ ...cfg, fetchImpl }), () => 'T', tracker);
+    return { c, tracker };
+  };
+
+  it('connection refused → [] + idle projection + tracker error/upstream_unreachable (no throw)', async () => {
+    const { c, tracker } = withTracker(vi.fn(async () => { throw new Error('ECONNREFUSED'); }) as unknown as typeof fetch);
+    expect(await c.getHypotheses()).toEqual([]);
+    expect(await c.getBacktests()).toEqual([]);
+    expect(await c.getAgentStatuses()).toEqual({ evaluator: 'idle', 'perf-monitor': 'idle' });
+    expect(tracker.snapshot()).toMatchObject({ state: 'error', reasonCode: 'upstream_unreachable' });
+  });
+
+  it('lab 401 → empty projection + tracker degraded/auth_failed', async () => {
+    const { c, tracker } = withTracker(vi.fn(async () => status(401)) as unknown as typeof fetch);
+    expect(await c.getHypotheses()).toEqual([]);
+    expect(tracker.snapshot()).toMatchObject({ state: 'degraded', reasonCode: 'auth_failed' });
+  });
+
+  it('lab 5xx → tracker error/upstream_5xx', async () => {
+    const { c, tracker } = withTracker(vi.fn(async () => status(500, 'boom')) as unknown as typeof fetch);
+    expect(await c.getBacktests()).toEqual([]);
+    expect(tracker.snapshot()).toMatchObject({ state: 'error', reasonCode: 'upstream_5xx' });
+  });
+
+  it('lab timeout (AbortError) → tracker error/upstream_timeout', async () => {
+    const { c, tracker } = withTracker(vi.fn(async () => { throw Object.assign(new Error('aborted'), { name: 'AbortError' }); }) as unknown as typeof fetch);
+    expect(await c.getHypotheses()).toEqual([]);
+    expect(tracker.snapshot()).toMatchObject({ state: 'error', reasonCode: 'upstream_timeout' });
+  });
+
+  it('malformed lab response → tracker error/upstream_bad_response', async () => {
+    const { c, tracker } = withTracker(vi.fn(async () => new Response('<<not json>>', { status: 200, headers: { 'content-type': 'application/json' } })) as unknown as typeof fetch);
+    expect(await c.getHypotheses()).toEqual([]);
+    expect(tracker.snapshot()).toMatchObject({ state: 'error', reasonCode: 'upstream_bad_response' });
+  });
+
+  it('a recovered read resets the tracker to live', async () => {
+    let fail = true;
+    const okEnvelope = new Response(JSON.stringify({ data: [], page: { nextCursor: null, limit: 20 } }), { status: 200, headers: { 'content-type': 'application/json' } });
+    const fetchImpl = vi.fn(async () => (fail ? status(500) : okEnvelope));
+    const { c, tracker } = withTracker(fetchImpl as unknown as typeof fetch);
+    await c.getHypotheses();
+    expect(tracker.snapshot().state).toBe('error');
+    fail = false;
+    await c.getHypotheses();
+    expect(tracker.snapshot()).toEqual({ state: 'live', reasonCode: null, message: 'reachable' });
+  });
+
+  it('strict getAgentActivity still throws a typed upstream error (mapped by app onError, not swallowed)', async () => {
+    const { c } = withTracker(vi.fn(async () => status(401)) as unknown as typeof fetch);
+    await expect(c.getAgentActivity('boss')).rejects.toMatchObject({ office: { code: 'upstream_unauthorized', reason: 'auth_failed' } });
   });
 });

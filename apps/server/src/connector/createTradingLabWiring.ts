@@ -4,6 +4,7 @@ import type { SseConnect } from './tradinglab/TradingLabStreamBridge';
 import type { PlatformMonitoringConnector } from './platform/PlatformMonitoringConnector';
 import { TradingLabHttpClient } from './tradinglab/TradingLabHttpClient';
 import { TradingLabReadConnector } from './tradinglab/TradingLabReadConnector';
+import { LabReadSourceTracker } from './tradinglab/labReadSource';
 import { TradingLabStreamBridge } from './tradinglab/TradingLabStreamBridge';
 import { InfraAggregator } from './InfraAggregator';
 import { CompositeOfficeReadConnector } from './CompositeOfficeReadConnector';
@@ -30,7 +31,10 @@ export function createTradingLabWiring(config: OfficeServerConfig, deps: Trading
     requestTimeoutMs: config.tradingLab.requestTimeoutMs,
     fetchImpl: deps.fetchImpl,
   });
-  const read = new TradingLabReadConnector(client, deps.now);
+  // Shared between the read connector (writer) and the InfraAggregator (reader):
+  // lets a degraded data read surface as the `trading-lab-read` infra source.
+  const labReadSource = new LabReadSourceTracker();
+  const read = new TradingLabReadConnector(client, deps.now, labReadSource);
   const bridge = new TradingLabStreamBridge({
     url: config.tradingLab.readUrl,
     readToken: config.tradingLab.readToken,
@@ -42,7 +46,7 @@ export function createTradingLabWiring(config: OfficeServerConfig, deps: Trading
     sleep: deps.sleep,
   });
   const platform = deps.platform ?? (config.platform.enabled ? createPlatformWiring(config, { fetchImpl: deps.fetchImpl }).connector : undefined);
-  const infra = new InfraAggregator(client, () => bridge.state(), deps.now, platform ? () => platform.getPlatformInfra() : undefined);
+  const infra = new InfraAggregator(client, () => bridge.state(), deps.now, platform ? () => platform.getPlatformInfra() : undefined, () => labReadSource.snapshot());
   const connector = new CompositeOfficeReadConnector({ read, infra, startBridge: (emit) => bridge.start(emit), platform });
   return { connector, bridge, client };
 }
