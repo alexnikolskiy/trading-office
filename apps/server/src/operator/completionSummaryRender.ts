@@ -3,6 +3,8 @@ import type { LabCompletionSummary, LabCompletionMetrics } from '../connector/tr
 const pct = (x: number | null): string | null => (x === null ? null : `${Math.round(x * 100)}%`);
 const n2 = (x: number | null): string | null => (x === null ? null : `${Math.round(x * 100) / 100}`);
 
+// winRate arrives as a 0..1 fraction (→ pct()); netPnlPct / maxDrawdownPct already arrive as
+// percentage NUMBERS (e.g. 12 = 12%) — render them raw. Do NOT wrap them in pct() (→ 1200%).
 function metricsLine(m: LabCompletionMetrics): string {
   const parts: string[] = [];
   if (m.netPnlUsd !== null) parts.push(`PnL ${m.netPnlUsd}${m.netPnlPct !== null ? ` (${m.netPnlPct}%)` : ''}`);

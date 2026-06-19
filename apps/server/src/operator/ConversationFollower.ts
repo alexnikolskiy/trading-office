@@ -169,6 +169,7 @@ export class ConversationFollower {
   }
 
   private finishFailed(message: string): void {
+    this.done = true; // defensive: finish() already owns `done`, but a direct caller must not re-enter
     this.deps.emit({
       type: 'operator_message_failed',
       ts: this.now(),

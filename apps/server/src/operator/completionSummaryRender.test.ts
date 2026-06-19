@@ -27,6 +27,8 @@ describe('renderCompletionSummary', () => {
 
   it('appends a degraded-data note when warnings are present', () => {
     const s: LabCompletionSummary = { kind: 'strategy.onboard', taskId: 't', status: 'completed', profile: null, links: { taskId: 't' }, warnings: ['profile_read_failed'] };
-    expect(renderCompletionSummary(s)).toContain('⚠'); // partial-data marker
+    const text = renderCompletionSummary(s);
+    expect(text).toContain('Профиль создан'); // null-profile fallback head
+    expect(text).toContain('⚠'); // partial-data marker
   });
 });
