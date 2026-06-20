@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { makeTradingLabOperatorResponder } from './TradingLabOperatorResponder';
+import { makeTradingLabOperatorResponder, makeTradingLabOperatorConfirmResponder } from './TradingLabOperatorResponder';
 import { OfficeEventBus } from '../events/OfficeEventBus';
 import type { LabChatResponse } from '../connector/tradinglab/labDtos';
 import type { OfficeEvent } from '@trading-office/office-gateway';
@@ -19,6 +19,10 @@ function setup(resp: LabChatResponse, startFollow = vi.fn()) {
     chat: chat as never, client: {} as never, bridge: {} as never, guards, now: NOW, newIds: fixedIds, startFollow,
   });
   return { bus, seen, chat, responder, startFollow };
+}
+
+function depsWith(chat: { send: (...a: never[]) => Promise<LabChatResponse>; confirm: (...a: never[]) => Promise<LabChatResponse> }, startFollow = vi.fn()) {
+  return { chat: chat as never, client: {} as never, bridge: {} as never, guards, now: NOW, newIds: fixedIds, startFollow };
 }
 
 describe('makeTradingLabOperatorResponder', () => {
@@ -76,5 +80,56 @@ describe('makeTradingLabOperatorResponder', () => {
     responder(msg, bus);
     await flush();
     expect(seen.map((e) => e.type)).toEqual(['operator_message_accepted', 'operator_message_failed']);
+  });
+
+  it('runTurn assistant_message proposal -> completed carrying actions + evidence + ids', async () => {
+    const bus = new OfficeEventBus();
+    const seen: OfficeEvent[] = [];
+    bus.subscribe((e) => seen.push(e));
+    const chat = {
+      send: async () => ({ kind: 'assistant_message' as const, sessionId: 's1', message: 'Подтвердите запуск анализа.', evidence: [{ kind: 'exact_duplicate' as const, text: 'dup', sourceId: 'pf1' }], actions: [{ id: 'confirm' as const, label: 'Подтвердить', style: 'primary' as const }], pendingInteractionId: 'p1' }),
+      confirm: async (): Promise<LabChatResponse> => { throw new Error('unused'); },
+    };
+    const responder = makeTradingLabOperatorResponder(depsWith(chat));
+    responder(msg, bus);
+    await flush();
+    const done = seen.find((e) => e.type === 'operator_message_completed') as Extract<OfficeEvent, { type: 'operator_message_completed' }>;
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    expect(done!.reply.actions![0]!.id).toBe('confirm');
+    expect(done!.reply.pendingInteractionId).toBe('p1');
+    expect(done!.reply.evidence![0]!.sourceId).toBe('pf1');
+  });
+});
+
+describe('makeTradingLabOperatorConfirmResponder', () => {
+  it('confirm responder: assistant_message terminal (not_found) -> completed with NO actions', async () => {
+    const bus = new OfficeEventBus();
+    const seen: OfficeEvent[] = [];
+    bus.subscribe((e) => seen.push(e));
+    const chat = {
+      send: async (): Promise<LabChatResponse> => { throw new Error('unused'); },
+      confirm: async () => ({ kind: 'assistant_message' as const, sessionId: 's1', message: 'Не нашёл активного подтверждения. Пришлите запрос заново.', evidence: [], actions: [] }),
+    };
+    const respondConfirm = makeTradingLabOperatorConfirmResponder(depsWith(chat));
+    respondConfirm({ pendingInteractionId: 'gone', sessionId: 's1', decision: 'confirm' }, bus);
+    await flush();
+    const done = seen.find((e) => e.type === 'operator_message_completed') as Extract<OfficeEvent, { type: 'operator_message_completed' }> | undefined;
+    expect(done?.reply.text).toContain('Не нашёл');
+    expect(done?.reply.actions ?? []).toHaveLength(0);
+  });
+
+  it('confirm responder: task_created -> progress + startFollow', async () => {
+    const bus = new OfficeEventBus();
+    const seen: OfficeEvent[] = [];
+    bus.subscribe((e) => seen.push(e));
+    const startFollow = vi.fn();
+    const chat = {
+      send: async (): Promise<LabChatResponse> => { throw new Error('unused'); },
+      confirm: async () => ({ kind: 'task_created' as const, sessionId: 's1', taskId: 't9', taskType: 'strategy.onboard', status: 'queued' as const }),
+    };
+    const respondConfirm = makeTradingLabOperatorConfirmResponder({ ...depsWith(chat), startFollow });
+    respondConfirm({ pendingInteractionId: 'p1', sessionId: 's1', decision: 'confirm' }, bus);
+    await flush();
+    expect(startFollow).toHaveBeenCalledWith(expect.objectContaining({ taskId: 't9' }));
   });
 });

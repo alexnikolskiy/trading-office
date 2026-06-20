@@ -16,6 +16,9 @@ import type {
   operatorMessageSchema,
   operatorMessageAcceptedSchema,
   operatorReplySchema,
+  operatorConfirmSchema,
+  operatorEvidenceBadgeSchema,
+  operatorActionSchema,
 } from './schemas';
 
 export type { AgentStatus };
@@ -34,3 +37,6 @@ export type InfraStatus = z.infer<typeof infraStatusSchema>;
 export type OperatorMessage = z.infer<typeof operatorMessageSchema>;
 export type OperatorMessageAccepted = z.infer<typeof operatorMessageAcceptedSchema>;
 export type OperatorReply = z.infer<typeof operatorReplySchema>;
+export type OperatorConfirm = z.infer<typeof operatorConfirmSchema>;
+export type OperatorEvidenceBadge = z.infer<typeof operatorEvidenceBadgeSchema>;
+export type OperatorAction = z.infer<typeof operatorActionSchema>;

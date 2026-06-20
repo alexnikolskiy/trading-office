@@ -61,4 +61,31 @@ describe('office HTTP routes', () => {
     expect(res.status).toBe(400);
     expect((await res.json()).error.code).toBe('bad_request');
   });
+
+  it('POST /api/office/operator/confirm invokes the confirm responder and returns accepted', async () => {
+    const calls: unknown[] = [];
+    const operatorConfirmResponder = (c: unknown) => { calls.push(c); return { operatorMessageId: 'm1', conversationId: 'c1', status: 'accepted' as const }; };
+    const config = loadConfig({});
+    const bus = new OfficeEventBus();
+    const connector = new FixtureOfficeReadConnector(config);
+    const { app } = createOfficeApp({ connector, bus, config, operatorConfirmResponder });
+    const res = await app.request(OFFICE_API.operatorConfirm, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ pendingInteractionId: 'p1', sessionId: 's1', decision: 'confirm' }),
+    });
+    expect(res.status).toBe(200);
+    expect(calls).toHaveLength(1);
+  });
+
+  it('POST /api/office/operator/confirm with a bad body -> 400', async () => {
+    const { app } = makeApp();
+    const res = await app.request(OFFICE_API.operatorConfirm, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ decision: 'maybe' }),
+    });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error.code).toBe('bad_request');
+  });
 });

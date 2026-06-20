@@ -82,7 +82,12 @@ export interface LabCursorEnvelope<T> {
 
 // Chat ingress response — discriminated on `kind`. TaskStatus terminal = completed|failed|rejected.
 export type LabTaskStatus = 'accepted' | 'queued' | 'running' | 'completed' | 'failed' | 'rejected';
+
+export interface LabEvidenceCard { kind: 'interpretation' | 'exact_duplicate' | 'similar' | 'warning'; text: string; sourceId?: string }
+export interface LabAction { id: 'confirm' | 'cancel'; label: string; style: 'primary' | 'secondary' }
+
 export type LabChatResponse =
+  | { kind: 'assistant_message'; sessionId: string; message: string; evidence: LabEvidenceCard[]; actions: LabAction[]; pendingInteractionId?: string }
   | { kind: 'task_created'; sessionId: string; taskId: string; taskType: string; status: LabTaskStatus; plannedNextStep?: { taskType: string; after: string } }
   | { kind: 'task_status'; sessionId: string; taskId: string; status: LabTaskStatus }
   | { kind: 'needs_clarification'; sessionId: string; question: string; missing: string[] }

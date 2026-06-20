@@ -6,8 +6,8 @@ import { createTradingLabWiring } from './connector/createTradingLabWiring';
 import { FixtureOfficeReadConnector } from './connector/FixtureOfficeReadConnector';
 import { OfficeEventBus } from './events/OfficeEventBus';
 import { TradingLabChatConnector } from './operator/TradingLabChatConnector';
-import { makeTradingLabOperatorResponder, makeChatUnavailableResponder } from './operator/TradingLabOperatorResponder';
-import type { OperatorResponder } from './operator/TradingLabOperatorResponder';
+import { makeTradingLabOperatorResponder, makeTradingLabOperatorConfirmResponder, makeChatUnavailableResponder } from './operator/TradingLabOperatorResponder';
+import type { OperatorResponder, OperatorConfirmResponder } from './operator/TradingLabOperatorResponder';
 
 const nowIso = (): string => new Date().toISOString();
 
@@ -22,6 +22,7 @@ const heartbeat = setInterval(() => {
 }, config.heartbeatMs);
 
 let operatorResponder: OperatorResponder | undefined;
+let operatorConfirmResponder: OperatorConfirmResponder | undefined;
 if (wiring) {
   if (config.tradingLab.chatToken) {
     const chat = new TradingLabChatConnector({
@@ -29,13 +30,15 @@ if (wiring) {
       chatToken: config.tradingLab.chatToken,
       requestTimeoutMs: config.tradingLab.requestTimeoutMs,
     });
-    operatorResponder = makeTradingLabOperatorResponder({ chat, client: wiring.client, bridge: wiring.bridge, guards: config.chatFollow, completionSummaryEnabled: config.chatFollow.completionSummaryEnabled });
+    const responderDeps = { chat, client: wiring.client, bridge: wiring.bridge, guards: config.chatFollow, completionSummaryEnabled: config.chatFollow.completionSummaryEnabled };
+    operatorResponder = makeTradingLabOperatorResponder(responderDeps);
+    operatorConfirmResponder = makeTradingLabOperatorConfirmResponder(responderDeps);
   } else {
     operatorResponder = makeChatUnavailableResponder();
   }
 }
 
-const { app, injectWebSocket } = createOfficeApp({ connector, bus, config, operatorResponder });
+const { app, injectWebSocket } = createOfficeApp({ connector, bus, config, operatorResponder, operatorConfirmResponder });
 const server = serve({ fetch: app.fetch, port: config.port }, (info) => {
   console.log(`office server listening on :${info.port}`);
 });
