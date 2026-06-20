@@ -1,7 +1,7 @@
 import { createNodeWebSocket } from '@hono/node-ws';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { OFFICE_API, operatorMessageSchema } from '@trading-office/office-gateway';
+import { OFFICE_API, operatorMessageSchema, operatorConfirmSchema } from '@trading-office/office-gateway';
 import type { OfficeEvent } from '@trading-office/office-gateway';
 import type { OfficeServerConfig } from './config';
 import { loadConfig } from './config';
@@ -9,7 +9,7 @@ import type { OfficeReadConnector } from './connector/OfficeReadConnector';
 import { FixtureOfficeReadConnector } from './connector/FixtureOfficeReadConnector';
 import { OfficeEventBus } from './events/OfficeEventBus';
 import { handleOperatorMessage } from './operator/responder';
-import type { OperatorResponder } from './operator/TradingLabOperatorResponder';
+import type { OperatorResponder, OperatorConfirmResponder } from './operator/TradingLabOperatorResponder';
 
 const nowIso = (): string => new Date().toISOString();
 
@@ -18,6 +18,7 @@ export interface OfficeAppDeps {
   bus: OfficeEventBus;
   config: OfficeServerConfig;
   operatorResponder?: OperatorResponder;
+  operatorConfirmResponder?: OperatorConfirmResponder;
 }
 
 export function createOfficeApp(deps: OfficeAppDeps) {
@@ -43,6 +44,17 @@ export function createOfficeApp(deps: OfficeAppDeps) {
     }
     const respond: OperatorResponder = deps.operatorResponder ?? ((m, b) => handleOperatorMessage(m, b));
     return c.json(respond(parsed.data, deps.bus));
+  });
+
+  app.post(OFFICE_API.operatorConfirm, async (c) => {
+    const parsed = operatorConfirmSchema.safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) {
+      return c.json({ error: { code: 'bad_request', message: 'invalid operator confirm' } }, 400);
+    }
+    if (!deps.operatorConfirmResponder) {
+      return c.json({ error: { code: 'not_configured', message: 'operator confirm not configured' } }, 503);
+    }
+    return c.json(deps.operatorConfirmResponder(parsed.data, deps.bus));
   });
 
   app.get(
