@@ -267,6 +267,13 @@ body {
 @keyframes ai-dot { 0%, 80%, 100% { opacity: 0.25; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-2px); } }
 @keyframes ai-caret { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
 
+.chat__badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.chat__badge { font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--accent); background: transparent; color: var(--accent); cursor: pointer; opacity: 0.85; }
+.chat__badge:hover { opacity: 1; }
+.chat__actions { display: flex; gap: 8px; margin-top: 10px; }
+.chat__action { font-size: 13px; padding: 4px 12px; border-radius: 8px; cursor: pointer; border: 1px solid var(--panel-edge); background: var(--panel-edge); color: var(--ink); }
+.chat__action[data-style="primary"] { font-weight: 600; background: var(--accent); color: #04201a; border-color: var(--accent); }
+
 /* ================================================================ exit / errors */
 .exit-confirm { width: 300px; text-align: center; }
 .exit-confirm__actions { display: flex; justify-content: center; gap: 10px; margin-top: 14px; }
