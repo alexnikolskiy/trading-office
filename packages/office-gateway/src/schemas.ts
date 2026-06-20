@@ -93,12 +93,32 @@ export const operatorMessageAcceptedSchema = z.object({
   conversationId: z.string(),
   status: z.literal('accepted'),
 });
+export const operatorEvidenceBadgeSchema = z.object({
+  kind: z.enum(['interpretation', 'exact_duplicate', 'similar', 'warning']),
+  label: z.string(),
+  sourceId: z.string().optional(),
+});
+export const operatorActionSchema = z.object({
+  id: z.enum(['confirm', 'cancel']),
+  label: z.string(),
+  style: z.enum(['primary', 'secondary']),
+});
+export const operatorConfirmSchema = z.object({
+  pendingInteractionId: z.string(),
+  sessionId: z.string(),
+  decision: z.enum(['confirm', 'cancel']),
+});
+
 export const operatorReplySchema = z.object({
   replyMessageId: z.string(),
   operatorMessageId: z.string(),
   conversationId: z.string(),
   text: z.string(),
   ts: z.string(),
+  evidence: z.array(operatorEvidenceBadgeSchema).optional(),
+  actions: z.array(operatorActionSchema).optional(),
+  pendingInteractionId: z.string().optional(),
+  sessionId: z.string().optional(),
 });
 
 export const officeErrorSchema = z.object({ code: z.string(), message: z.string() });

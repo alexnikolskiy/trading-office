@@ -7,6 +7,8 @@ import {
   operatorMessageAcceptedSchema,
   officeErrorBodySchema,
   officeEventSchema,
+  operatorReplySchema,
+  operatorConfirmSchema,
 } from './schemas';
 
 describe('contract schemas round-trip', () => {
@@ -60,6 +62,30 @@ describe('OfficeEvent schema', () => {
 
   it('rejects an event with an unknown type', () => {
     expect(() => officeEventSchema.parse({ type: 'unknown_event', ts: '2024-01-01T00:00:00Z' })).toThrow();
+  });
+});
+
+describe('operator confirm wire', () => {
+  it('operatorReplySchema accepts an evidence/actions proposal reply', () => {
+    const r = operatorReplySchema.parse({
+      replyMessageId: 'r1', operatorMessageId: 'm1', conversationId: 'c1', text: 'proposal', ts: 't',
+      evidence: [{ kind: 'exact_duplicate', label: '⚠ точный дубликат', sourceId: 'p1' }],
+      actions: [{ id: 'confirm', label: 'Подтвердить', style: 'primary' }],
+      pendingInteractionId: 'p1', sessionId: 's1',
+    });
+    expect(r.actions?.[0]!.id).toBe('confirm');
+    expect(r.evidence?.[0]!.sourceId).toBe('p1');
+  });
+
+  it('operatorReplySchema still accepts a plain text reply (back-compat)', () => {
+    const r = operatorReplySchema.parse({ replyMessageId: 'r', operatorMessageId: 'm', conversationId: 'c', text: 'hi', ts: 't' });
+    expect(r.actions).toBeUndefined();
+  });
+
+  it('operatorConfirmSchema validates a confirm request', () => {
+    const v = operatorConfirmSchema.parse({ pendingInteractionId: 'p1', sessionId: 's1', decision: 'confirm' });
+    expect(v.decision).toBe('confirm');
+    expect(() => operatorConfirmSchema.parse({ pendingInteractionId: 'p', sessionId: 's', decision: 'maybe' })).toThrow();
   });
 });
 

@@ -8,5 +8,6 @@ export const OFFICE_API = {
   knowledge: '/api/office/knowledge',
   infra: '/api/office/infra',
   operatorMessages: '/api/office/operator/messages',
+  operatorConfirm: '/api/office/operator/confirm',
   events: '/api/office/events',
 } as const;
