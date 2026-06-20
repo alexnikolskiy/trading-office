@@ -27,4 +27,26 @@ describe('TradingLabChatConnector', () => {
     const c = new TradingLabChatConnector({ ...cfg, fetchImpl });
     await expect(c.send({ message: 'x', sessionId: 's' })).rejects.toMatchObject({ office: { code: 'upstream_unauthorized' } });
   });
+
+  it('confirm() POSTs to /chat/confirm with bearer + body and returns the lab response', async () => {
+    let captured: { url: string; init: RequestInit } | null = null;
+    const fetchImpl = (async (url: string, init: RequestInit) => {
+      captured = { url, init };
+      return new Response(JSON.stringify({ kind: 'task_created', sessionId: 's1', taskId: 't1', taskType: 'strategy.onboard', status: 'queued' }), { status: 200 });
+    }) as unknown as typeof fetch;
+    const c = new TradingLabChatConnector({ chatUrl: 'http://lab:3000', chatToken: 'tok', requestTimeoutMs: 1000, fetchImpl });
+
+    const res = await c.confirm({ pendingInteractionId: 'p1', sessionId: 's1', decision: 'confirm' });
+
+    expect(captured!.url).toBe('http://lab:3000/chat/confirm');
+    expect((captured!.init.headers as Record<string, string>).Authorization).toBe('Bearer tok');
+    expect(JSON.parse(captured!.init.body as string)).toEqual({ pendingInteractionId: 'p1', sessionId: 's1', decision: 'confirm' });
+    expect(res.kind).toBe('task_created');
+  });
+
+  it('confirm() maps a 401 to upstream_unauthorized', async () => {
+    const fetchImpl = (async () => new Response('', { status: 401 })) as unknown as typeof fetch;
+    const c = new TradingLabChatConnector({ chatUrl: 'http://lab:3000', chatToken: 'tok', requestTimeoutMs: 1000, fetchImpl });
+    await expect(c.confirm({ pendingInteractionId: 'p', sessionId: 's', decision: 'confirm' })).rejects.toMatchObject({ office: { code: 'upstream_unauthorized' } });
+  });
 });

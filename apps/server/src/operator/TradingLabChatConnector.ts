@@ -17,6 +17,11 @@ export interface ChatSendInput {
   sessionId: string;
   channel?: 'web' | 'telegram';
 }
+export interface ChatConfirmInput {
+  pendingInteractionId: string;
+  sessionId: string;
+  decision: 'confirm' | 'cancel';
+}
 
 export class TradingLabChatConnector {
   private readonly fetchImpl: typeof fetch;
@@ -44,6 +49,29 @@ export class TradingLabChatConnector {
     if (res.status === 503) throw makeErr('upstream_unavailable', 'chat ingress not configured');
     if (res.status >= 500) throw makeErr('upstream_unavailable', `chat ingress returned ${res.status}`);
     if (res.status >= 400) throw makeErr('upstream_bad_request', `chat ingress returned ${res.status}`);
+    return (await res.json()) as LabChatResponse;
+  }
+
+  async confirm(input: ChatConfirmInput): Promise<LabChatResponse> {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), this.deps.requestTimeoutMs);
+    let res: Response;
+    try {
+      res = await this.fetchImpl(`${this.deps.chatUrl}/chat/confirm`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', Authorization: `Bearer ${this.deps.chatToken}` },
+        body: JSON.stringify({ pendingInteractionId: input.pendingInteractionId, sessionId: input.sessionId, decision: input.decision }),
+        signal: ctrl.signal,
+      });
+    } catch (e) {
+      throw makeErr('upstream_unavailable', `chat confirm request failed: ${(e as Error).message}`);
+    } finally {
+      clearTimeout(timer);
+    }
+    if (res.status === 401 || res.status === 403) throw makeErr('upstream_unauthorized', `chat confirm returned ${res.status}`);
+    if (res.status === 503) throw makeErr('upstream_unavailable', 'chat ingress not configured');
+    if (res.status >= 500) throw makeErr('upstream_unavailable', `chat confirm returned ${res.status}`);
+    if (res.status >= 400) throw makeErr('upstream_bad_request', `chat confirm returned ${res.status}`);
     return (await res.json()) as LabChatResponse;
   }
 }
