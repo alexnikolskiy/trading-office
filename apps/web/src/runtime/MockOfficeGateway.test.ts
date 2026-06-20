@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, afterEach } from 'vitest';
+import type { OfficeEvent } from '@trading-office/office-gateway';
 import { MockOfficeGateway } from './MockOfficeGateway';
 
 const gw = new MockOfficeGateway({ latencyMs: 0 });
@@ -22,6 +23,17 @@ describe('MockOfficeGateway', () => {
     expect(acc.status).toBe('accepted');
     expect(acc.operatorMessageId).toBeTruthy();
     expect(acc.conversationId).toBeTruthy();
+  });
+
+  it('confirmAction emits accepted + completed and returns accepted', async () => {
+    const gw = new MockOfficeGateway({ latencyMs: 0 });
+    const events: OfficeEvent[] = [];
+    gw.subscribeOfficeEvents((e) => events.push(e));
+    const accepted = await gw.confirmAction({ pendingInteractionId: 'p1', sessionId: 's1', decision: 'confirm' });
+    await new Promise((r) => setTimeout(r, 80));
+    const completed = events.find((e) => e.type === 'operator_message_completed');
+    expect(accepted.status).toBe('accepted');
+    expect(completed && completed.type === 'operator_message_completed' && completed.operatorMessageId).toBe(accepted.operatorMessageId);
   });
 
   it('subscribeOfficeEvents emits an initial snapshot and can be unsubscribed', () => {

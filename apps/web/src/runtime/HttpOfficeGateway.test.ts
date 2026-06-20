@@ -74,6 +74,26 @@ describe('HttpOfficeGateway', () => {
     expect(seen).not.toContain('error');
   });
 
+  it('confirmAction POSTs to operatorConfirm and returns accepted', async () => {
+    let captured: { url: string; init?: RequestInit } | undefined;
+    const fetchImpl = async (url: string, init?: RequestInit) => {
+      captured = { url, init };
+      return new Response(JSON.stringify({ operatorMessageId: 'm9', conversationId: 'c9', status: 'accepted' }), { status: 200 });
+    };
+    const gw = new HttpOfficeGateway({ baseUrl: 'http://office', fetchImpl });
+    const accepted = await gw.confirmAction({ pendingInteractionId: 'p1', sessionId: 's1', decision: 'confirm' });
+    expect(captured!.url).toBe('http://office' + OFFICE_API.operatorConfirm);
+    expect(captured!.init!.method).toBe('POST');
+    expect(JSON.parse(captured!.init!.body as string)).toEqual({ pendingInteractionId: 'p1', sessionId: 's1', decision: 'confirm' });
+    expect(accepted.operatorMessageId).toBe('m9');
+  });
+
+  it('confirmAction throws on a non-ok response', async () => {
+    const fetchImpl = async () => new Response('', { status: 503 });
+    const gw = new HttpOfficeGateway({ baseUrl: 'http://office', fetchImpl });
+    await expect(gw.confirmAction({ pendingInteractionId: 'p', sessionId: 's', decision: 'cancel' })).rejects.toThrow();
+  });
+
   it('signals connection state across the WS lifecycle', () => {
     const sockets: FakeWs[] = [];
     const gw = new HttpOfficeGateway({
