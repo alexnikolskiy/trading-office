@@ -86,3 +86,34 @@ it('turnEvidenceView projects the reply text + badges (audit-safe)', () => {
   expect(view.badges).toHaveLength(1);
   expect(view.badges[0]?.kind).toBe('exact_duplicate');
 });
+
+it('completed arriving BEFORE accepted is buffered and applied (Q4)', () => {
+  // submit (turn has operatorMessageId=null) → completed for mX arrives first → accepted binds localId→mX
+  let s = transcriptReducer(emptyTranscript, { kind: 'submit', localId: 'L1', text: 'go' });
+  s = transcriptReducer(s, {
+    kind: 'event',
+    event: { type: 'operator_message_completed', ts: 't', operatorMessageId: 'mX', conversationId: 'cX', replyMessageId: 'rX',
+      reply: { replyMessageId: 'rX', operatorMessageId: 'mX', conversationId: 'cX', text: 'outcome', ts: 't' } },
+  });
+  // not dropped — held in pendingCompleted, turn still pending
+  expect(s.turns[0]!.status).toBe('pending');
+  expect(s.pendingCompleted['mX']).toBeDefined();
+  s = transcriptReducer(s, { kind: 'accepted', localId: 'L1', operatorMessageId: 'mX', conversationId: 'cX' });
+  // applied on accepted; buffer cleared
+  expect(s.turns[0]!.status).toBe('completed');
+  expect(s.turns[0]!.replyText).toBe('outcome');
+  expect(s.pendingCompleted['mX']).toBeUndefined();
+});
+
+it('in-order submit → accepted → completed is unchanged (Q4 no regression)', () => {
+  let s = transcriptReducer(emptyTranscript, { kind: 'submit', localId: 'L1', text: 'go' });
+  s = transcriptReducer(s, { kind: 'accepted', localId: 'L1', operatorMessageId: 'mY', conversationId: 'cY' });
+  s = transcriptReducer(s, {
+    kind: 'event',
+    event: { type: 'operator_message_completed', ts: 't', operatorMessageId: 'mY', conversationId: 'cY', replyMessageId: 'rY',
+      reply: { replyMessageId: 'rY', operatorMessageId: 'mY', conversationId: 'cY', text: 'hi', ts: 't' } },
+  });
+  expect(s.turns[0]!.status).toBe('completed');
+  expect(s.turns[0]!.replyText).toBe('hi');
+  expect(Object.keys(s.pendingCompleted)).toHaveLength(0);
+});
