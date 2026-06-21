@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type { OfficeEvent, OperatorAction, OperatorConfirm, OperatorEvidenceBadge, OperatorMessage, OperatorMessageAccepted, OperatorReply } from '@trading-office/office-gateway';
 import type { OfficeEventBus } from '../events/OfficeEventBus';
 import type { ChatFollowConfig } from '../config';
@@ -12,8 +13,7 @@ export type OperatorResponder = (msg: OperatorMessage, bus: OfficeEventBus) => O
 export type OperatorConfirmResponder = (confirm: OperatorConfirm, bus: OfficeEventBus) => OperatorMessageAccepted;
 
 export function defaultNewIds(): () => FollowerIds {
-  let c = 0;
-  return () => { c += 1; return { operatorMessageId: `m${c}`, conversationId: `c${c}`, replyMessageId: `r${c}` }; };
+  return () => ({ operatorMessageId: randomUUID(), conversationId: randomUUID(), replyMessageId: randomUUID() });
 }
 
 export interface StartFollowArgs { ids: FollowerIds; taskId: string; taskType?: string; nextTaskType?: string; emit: (e: OfficeEvent) => void }
@@ -37,7 +37,9 @@ function badgeLabel(c: LabEvidenceCard): string {
 }
 
 function toBadges(cards: LabEvidenceCard[]): OperatorEvidenceBadge[] {
-  return cards.map((c) => ({ kind: c.kind, label: c.kind === 'interpretation' ? c.text : badgeLabel(c), sourceId: c.sourceId }));
+  return cards
+    .filter((c) => c.kind !== 'interpretation')
+    .map((c) => ({ kind: c.kind, label: badgeLabel(c), sourceId: c.sourceId }));
 }
 
 function emitFromLabResponse(

@@ -1,5 +1,7 @@
 import type { OfficeEvent, OperatorEvidenceBadge, OperatorAction } from '@trading-office/office-gateway';
 
+type CompletedReply = Extract<OfficeEvent, { type: 'operator_message_completed' }>['reply'];
+
 export interface OperatorTurn {
   localId: string;
   operatorMessageId: string | null;
@@ -17,9 +19,10 @@ export interface OperatorTurn {
 
 export interface OperatorTranscriptState {
   turns: OperatorTurn[];
+  pendingCompleted: Record<string, CompletedReply>;
 }
 
-export const emptyTranscript: OperatorTranscriptState = { turns: [] };
+export const emptyTranscript: OperatorTranscriptState = { turns: [], pendingCompleted: {} };
 
 export type TranscriptAction =
   | { kind: 'submit'; localId: string; text: string }
@@ -34,28 +37,49 @@ function mapById(
   fn: (t: OperatorTurn) => OperatorTurn,
 ): OperatorTranscriptState {
   if (!state.turns.some((t) => t.operatorMessageId === operatorMessageId)) return state;
-  return { turns: state.turns.map((t) => (t.operatorMessageId === operatorMessageId ? fn(t) : t)) };
+  return { ...state, turns: state.turns.map((t) => (t.operatorMessageId === operatorMessageId ? fn(t) : t)) };
+}
+
+function withCompleted(turn: OperatorTurn, reply: CompletedReply): OperatorTurn {
+  return {
+    ...turn,
+    replyText: reply.text,
+    status: 'completed',
+    evidence: reply.evidence,
+    actions: reply.actions,
+    pendingInteractionId: reply.pendingInteractionId,
+    sessionId: reply.sessionId,
+  };
 }
 
 export function transcriptReducer(state: OperatorTranscriptState, action: TranscriptAction): OperatorTranscriptState {
   switch (action.kind) {
     case 'submit':
       return {
+        ...state,
         turns: [
           ...state.turns,
           { localId: action.localId, operatorMessageId: null, conversationId: null, userText: action.text, replyText: '', status: 'pending' },
         ],
       };
-    case 'accepted':
+    case 'accepted': {
+      const turns = state.turns.map((t) =>
+        t.localId === action.localId
+          ? { ...t, operatorMessageId: action.operatorMessageId, conversationId: action.conversationId, status: 'streaming' as const }
+          : t,
+      );
+      const buffered = state.pendingCompleted[action.operatorMessageId];
+      if (!buffered) return { ...state, turns };
+      const { [action.operatorMessageId]: _applied, ...restPending } = state.pendingCompleted;
       return {
-        turns: state.turns.map((t) =>
-          t.localId === action.localId
-            ? { ...t, operatorMessageId: action.operatorMessageId, conversationId: action.conversationId, status: 'streaming' }
-            : t,
-        ),
+        ...state,
+        turns: turns.map((t) => (t.operatorMessageId === action.operatorMessageId ? withCompleted(t, buffered) : t)),
+        pendingCompleted: restPending,
       };
+    }
     case 'submit_failed':
       return {
+        ...state,
         turns: state.turns.map((t) =>
           t.localId === action.localId ? { ...t, status: 'failed', error: action.error } : t,
         ),
@@ -65,16 +89,13 @@ export function transcriptReducer(state: OperatorTranscriptState, action: Transc
     case 'event': {
       const e = action.event;
       if (e.type === 'operator_message_delta') return mapById(state, e.operatorMessageId, (t) => ({ ...t, replyText: t.replyText + e.textDelta, status: 'streaming' }));
-      if (e.type === 'operator_message_completed')
-        return mapById(state, e.operatorMessageId, (t) => ({
-          ...t,
-          replyText: e.reply.text,
-          status: 'completed',
-          evidence: e.reply.evidence,
-          actions: e.reply.actions,
-          pendingInteractionId: e.reply.pendingInteractionId,
-          sessionId: e.reply.sessionId,
-        }));
+      if (e.type === 'operator_message_completed') {
+        const hasTurn = state.turns.some((t) => t.operatorMessageId === e.operatorMessageId);
+        if (!hasTurn) {
+          return { ...state, pendingCompleted: { ...state.pendingCompleted, [e.operatorMessageId]: e.reply } };
+        }
+        return mapById(state, e.operatorMessageId, (t) => withCompleted(t, e.reply));
+      }
       if (e.type === 'operator_message_failed') return mapById(state, e.operatorMessageId, (t) => ({ ...t, status: 'failed', error: e.error.message }));
       return state;
     }
