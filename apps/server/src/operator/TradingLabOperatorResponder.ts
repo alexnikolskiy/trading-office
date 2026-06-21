@@ -37,7 +37,9 @@ function badgeLabel(c: LabEvidenceCard): string {
 }
 
 function toBadges(cards: LabEvidenceCard[]): OperatorEvidenceBadge[] {
-  return cards.map((c) => ({ kind: c.kind, label: c.kind === 'interpretation' ? c.text : badgeLabel(c), sourceId: c.sourceId }));
+  return cards
+    .filter((c) => c.kind !== 'interpretation')
+    .map((c) => ({ kind: c.kind, label: badgeLabel(c), sourceId: c.sourceId }));
 }
 
 function emitFromLabResponse(

@@ -82,6 +82,26 @@ describe('makeTradingLabOperatorResponder', () => {
     expect(seen.map((e) => e.type)).toEqual(['operator_message_accepted', 'operator_message_failed']);
   });
 
+  it('runTurn drops the interpretation evidence card from the proposal badges (Q3)', async () => {
+    const bus = new OfficeEventBus();
+    const seen: OfficeEvent[] = [];
+    bus.subscribe((e) => seen.push(e));
+    const chat = {
+      send: async () => ({ kind: 'assistant_message' as const, sessionId: 's1', message: 'Вижу стратегию. Подтвердите запуск анализа.', evidence: [{ kind: 'interpretation' as const, text: 'Вижу стратегию. Подтвердите запуск анализа.' }, { kind: 'exact_duplicate' as const, text: 'dup', sourceId: 'pf1' }], actions: [{ id: 'confirm' as const, label: 'Подтвердить', style: 'primary' as const }], pendingInteractionId: 'p1' }),
+      confirm: async (): Promise<LabChatResponse> => { throw new Error('unused'); },
+    };
+    const responder = makeTradingLabOperatorResponder(depsWith(chat));
+    responder(msg, bus);
+    await flush();
+    const done = seen.find((e) => e.type === 'operator_message_completed') as Extract<OfficeEvent, { type: 'operator_message_completed' }>;
+    const badges = done.reply.evidence!;
+    expect(badges).toHaveLength(1);
+    expect(badges[0]!.kind).toBe('exact_duplicate');
+    expect(badges.some((b) => b.kind === 'interpretation')).toBe(false);
+    // the interpretation is still the message text:
+    expect(done.reply.text).toBe('Вижу стратегию. Подтвердите запуск анализа.');
+  });
+
   it('runTurn assistant_message proposal -> completed carrying actions + evidence + ids', async () => {
     const bus = new OfficeEventBus();
     const seen: OfficeEvent[] = [];
