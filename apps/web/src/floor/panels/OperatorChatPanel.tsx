@@ -8,7 +8,7 @@ import {
 } from 'react';
 import { useGateway } from '../../runtime/RuntimeContext';
 import { PanelChrome } from './PanelChrome';
-import { emptyTranscript, transcriptReducer, type OperatorTurn } from './operatorTranscript';
+import { emptyTranscript, transcriptReducer, isProposalTurn, turnEvidenceView, type OperatorTurn, type OperatorEvidenceView } from './operatorTranscript';
 
 /**
  * Chat — a ChatGPT/Claude-style surface: messages stack from the bottom; the
@@ -18,7 +18,7 @@ import { emptyTranscript, transcriptReducer, type OperatorTurn } from './operato
  * Wire model is unchanged (operatorTranscript reducer): submit → accepted →
  * delta* → completed, streamed over OfficeEvents. Inert: no execution authority.
  */
-export function OperatorChatPanel({ onClose }: { onClose: () => void }) {
+export function OperatorChatPanel({ onClose, onShowEvidence }: { onClose: () => void; onShowEvidence?: (view: OperatorEvidenceView) => void }) {
   const gateway = useGateway();
   const [state, dispatch] = useReducer(transcriptReducer, emptyTranscript);
   const [text, setText] = useState('');
@@ -71,6 +71,23 @@ export function OperatorChatPanel({ onClose }: { onClose: () => void }) {
     }
   }
 
+  async function confirm(turn: OperatorTurn, decision: 'confirm' | 'cancel') {
+    if (!turn.operatorMessageId || !turn.pendingInteractionId || !turn.sessionId) return;
+    dispatch({ kind: 'resolve', operatorMessageId: turn.operatorMessageId });
+    const localId = `L${(localSeq.current += 1)}`;
+    dispatch({ kind: 'submit', localId, text: decision === 'confirm' ? 'Подтвердить' : 'Отмена' });
+    try {
+      const accepted = await gateway.confirmAction({
+        pendingInteractionId: turn.pendingInteractionId,
+        sessionId: turn.sessionId,
+        decision,
+      });
+      dispatch({ kind: 'accepted', localId, operatorMessageId: accepted.operatorMessageId, conversationId: accepted.conversationId });
+    } catch (err) {
+      dispatch({ kind: 'submit_failed', localId, error: err instanceof Error ? err.message : 'confirm failed' });
+    }
+  }
+
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     void send();
@@ -97,7 +114,7 @@ export function OperatorChatPanel({ onClose }: { onClose: () => void }) {
           ) : (
             <ul className="chat__list">
               {state.turns.map((turn) => (
-                <ChatTurn key={turn.localId} turn={turn} />
+                <ChatTurn key={turn.localId} turn={turn} onConfirm={confirm} onShowEvidence={onShowEvidence} />
               ))}
             </ul>
           )}
@@ -139,8 +156,17 @@ export function OperatorChatPanel({ onClose }: { onClose: () => void }) {
   );
 }
 
-function ChatTurn({ turn }: { turn: OperatorTurn }) {
+function ChatTurn({
+  turn,
+  onConfirm,
+  onShowEvidence,
+}: {
+  turn: OperatorTurn;
+  onConfirm: (turn: OperatorTurn, decision: 'confirm' | 'cancel') => void;
+  onShowEvidence?: (view: OperatorEvidenceView) => void;
+}) {
   const typing = (turn.status === 'pending' || turn.status === 'streaming') && !turn.replyText;
+  const proposal = isProposalTurn(turn);
   return (
     <li className="chat__turn">
       <div className="chat__msg chat__msg--user">
@@ -157,11 +183,7 @@ function ChatTurn({ turn }: { turn: OperatorTurn }) {
           <span className="chat__avatar" aria-hidden="true">◆</span>
           <div className="chat__bubble chat__bubble--typing">
             <span className="chat__status">{turn.status === 'pending' ? 'connecting' : 'thinking'}</span>
-            <span className="chat__dots" aria-hidden="true">
-              <i />
-              <i />
-              <i />
-            </span>
+            <span className="chat__dots" aria-hidden="true"><i /><i /><i /></span>
           </div>
         </div>
       ) : (
@@ -170,6 +192,36 @@ function ChatTurn({ turn }: { turn: OperatorTurn }) {
           <div className="chat__bubble">
             {turn.replyText}
             {turn.status === 'streaming' && <span className="chat__caret" aria-hidden="true" />}
+            {turn.evidence && turn.evidence.length > 0 && (
+              <div className="chat__badges">
+                {turn.evidence.map((b, i) => (
+                  <button
+                    key={`${b.kind}:${b.sourceId ?? i}`}
+                    type="button"
+                    className="chat__badge"
+                    data-kind={b.kind}
+                    onClick={() => onShowEvidence?.(turnEvidenceView(turn))}
+                  >
+                    {b.label}
+                  </button>
+                ))}
+              </div>
+            )}
+            {proposal && (
+              <div className="chat__actions">
+                {turn.actions!.map((a) => (
+                  <button
+                    key={a.id}
+                    type="button"
+                    className="chat__action"
+                    data-style={a.style}
+                    onClick={() => onConfirm(turn, a.id)}
+                  >
+                    {a.label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

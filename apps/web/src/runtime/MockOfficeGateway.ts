@@ -8,6 +8,7 @@ import type {
   InfraStatus,
   KnowledgeEntry,
   OfficeEvent,
+  OperatorConfirm,
   OperatorMessage,
   OperatorMessageAccepted,
 } from './types';
@@ -66,6 +67,19 @@ export class MockOfficeGateway implements OfficeGateway {
         this.emit({ type: 'operator_message_completed', ts: nowIso(), operatorMessageId, conversationId, replyMessageId, reply: { replyMessageId, operatorMessageId, conversationId, text: acc, ts: nowIso() } });
       }
     }, (i + 1) * 120));
+    return this.delay({ operatorMessageId, conversationId, status: 'accepted' });
+  }
+
+  confirmAction(input: OperatorConfirm): Promise<OperatorMessageAccepted> {
+    const k = ++this.counter;
+    const operatorMessageId = `m${k}`;
+    const conversationId = `c${k}`;
+    const replyMessageId = `r${k}`;
+    const text = input.decision === 'confirm' ? 'Запрос отправлен в исследование.' : 'Отменено.';
+    this.emit({ type: 'operator_message_accepted', ts: nowIso(), operatorMessageId, conversationId });
+    setTimeout(() => {
+      this.emit({ type: 'operator_message_completed', ts: nowIso(), operatorMessageId, conversationId, replyMessageId, reply: { replyMessageId, operatorMessageId, conversationId, text, ts: nowIso() } });
+    }, 60);
     return this.delay({ operatorMessageId, conversationId, status: 'accepted' });
   }
 

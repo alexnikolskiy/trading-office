@@ -6,6 +6,7 @@ import type {
   Hypothesis,
   InfraStatus,
   KnowledgeEntry,
+  OperatorConfirm,
   OperatorMessage,
   OperatorMessageAccepted,
 } from './dto';
@@ -25,5 +26,7 @@ export interface OfficeGateway {
   getKnowledge(): Promise<KnowledgeEntry[]>;
   getInfraStatus(): Promise<InfraStatus>;
   sendOperatorMessage(msg: OperatorMessage): Promise<OperatorMessageAccepted>;
+  /** Structured confirm/cancel of a pending proposal — INERT: a research enqueue request, never an execution action. */
+  confirmAction(input: OperatorConfirm): Promise<OperatorMessageAccepted>;
   subscribeOfficeEvents?(cb: (e: OfficeEvent) => void): () => void;
 }

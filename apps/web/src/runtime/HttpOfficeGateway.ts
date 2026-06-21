@@ -10,6 +10,7 @@ import {
   type KnowledgeEntry,
   type OfficeEvent,
   type OfficeGateway,
+  type OperatorConfirm,
   type OperatorMessage,
   type OperatorMessageAccepted,
 } from '@trading-office/office-gateway';
@@ -90,6 +91,16 @@ export class HttpOfficeGateway implements OfficeGateway {
       body: JSON.stringify(msg),
     });
     if (!res.ok) throw new Error(`operator message rejected: ${res.status}`);
+    return (await res.json()) as OperatorMessageAccepted;
+  }
+
+  async confirmAction(input: OperatorConfirm): Promise<OperatorMessageAccepted> {
+    const res = await this.fetchImpl(this.baseUrl + OFFICE_API.operatorConfirm, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) throw new Error(`operator confirm rejected: ${res.status}`);
     return (await res.json()) as OperatorMessageAccepted;
   }
 
