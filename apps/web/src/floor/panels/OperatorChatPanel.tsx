@@ -29,7 +29,13 @@ export function OperatorChatPanel({ onClose, onShowEvidence }: { onClose: () => 
 
   useEffect(() => {
     if (!gateway.subscribeOfficeEvents) return;
-    return gateway.subscribeOfficeEvents((event) => dispatch({ kind: 'event', event }));
+    return gateway.subscribeOfficeEvents((event) => {
+      if (event.type === 'operator_assistant_message') {
+        dispatch({ kind: 'assistant_turn', operatorMessageId: event.operatorMessageId, conversationId: event.conversationId, reply: event.reply });
+        return;
+      }
+      dispatch({ kind: 'event', event });
+    });
   }, [gateway]);
 
   useEffect(() => {
@@ -169,9 +175,11 @@ function ChatTurn({
   const proposal = isProposalTurn(turn);
   return (
     <li className="chat__turn">
-      <div className="chat__msg chat__msg--user">
-        <div className="chat__bubble">{turn.userText}</div>
-      </div>
+      {turn.kind !== 'assistant' && (
+        <div className="chat__msg chat__msg--user">
+          <div className="chat__bubble">{turn.userText}</div>
+        </div>
+      )}
 
       {turn.status === 'failed' ? (
         <div className="chat__msg chat__msg--assistant">
