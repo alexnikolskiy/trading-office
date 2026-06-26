@@ -1,7 +1,7 @@
 import type { AgentStatusMap, AgentActivity, Hypothesis, BacktestSummary } from '@trading-office/office-gateway';
 import type { TradingLabHttpClient } from './TradingLabHttpClient';
 import type { LabReadSourceTracker } from './labReadSource';
-import { mapAgentStatuses, mapAgentActivity, mapHypothesis, mapBacktest, mapOfficeAgentIdToLab, NO_LAB_SOURCE_AGENTS } from './mappers';
+import { mapAgentStatuses, mapAgentActivity, mapHypothesis, mapBacktest, mapOfficeAgentIdToLab } from './mappers';
 
 export class TradingLabReadConnector {
   constructor(
@@ -18,12 +18,12 @@ export class TradingLabReadConnector {
   async getAgentStatuses(): Promise<AgentStatusMap> {
     try {
       const { data } = await this.client.getAgents();
-      const statuses = this.seedNoSource(mapAgentStatuses(data));
+      const statuses = mapAgentStatuses(data);
       this.labReadSource?.recordSuccess();
       return statuses;
     } catch (err) {
       this.labReadSource?.recordFailure(err);
-      return this.seedNoSource({});
+      return {};
     }
   }
 
@@ -68,11 +68,4 @@ export class TradingLabReadConnector {
     }
   }
 
-  /** Documented no-source office agents → honest idle, so the floor doesn't keep a misleading initial status. */
-  private seedNoSource(statuses: AgentStatusMap): AgentStatusMap {
-    for (const id of NO_LAB_SOURCE_AGENTS) {
-      if (!(id in statuses)) statuses[id] = 'idle';
-    }
-    return statuses;
-  }
 }

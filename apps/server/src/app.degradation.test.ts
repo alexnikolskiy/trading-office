@@ -52,7 +52,8 @@ describe('office dashboard — trading-lab upstream degradation', () => {
     }
     const res = await app.request(OFFICE_API.agentStatuses);
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ evaluator: 'idle', 'perf-monitor': 'idle' });
+    // Data-driven roster: no lab source → no agents (honest empty), still 200/never 500.
+    expect(await res.json()).toEqual({});
   });
 
   it('lab connection refused → trading-lab-read source error/upstream_unreachable (200 infra)', async () => {

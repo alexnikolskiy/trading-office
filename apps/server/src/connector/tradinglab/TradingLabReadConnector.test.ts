@@ -13,7 +13,7 @@ describe('TradingLabReadConnector', () => {
       { agentId: 'analyst', status: 'working', currentTaskId: null, lastEvent: null },
       { agentId: 'system', status: 'idle', currentTaskId: null, lastEvent: null },
     ], cursor: null })) as unknown as typeof fetch);
-    expect(await c.getAgentStatuses()).toEqual({ analyst: 'thinking', boss: 'idle', evaluator: 'idle', 'perf-monitor': 'idle' });
+    expect(await c.getAgentStatuses()).toEqual({ analyst: 'thinking', boss: 'idle' });
   });
 
   it('maps /v1/hypotheses (page envelope) → Hypothesis[]', async () => {
@@ -65,7 +65,7 @@ describe('TradingLabReadConnector — graceful degradation (no throw on upstream
     const { c, tracker } = withTracker(vi.fn(async () => { throw new Error('ECONNREFUSED'); }) as unknown as typeof fetch);
     expect(await c.getHypotheses()).toEqual([]);
     expect(await c.getBacktests()).toEqual([]);
-    expect(await c.getAgentStatuses()).toEqual({ evaluator: 'idle', 'perf-monitor': 'idle' });
+    expect(await c.getAgentStatuses()).toEqual({});
     expect(tracker.snapshot()).toMatchObject({ state: 'error', reasonCode: 'upstream_unreachable' });
   });
 
