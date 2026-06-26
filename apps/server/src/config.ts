@@ -39,6 +39,17 @@ export interface DownstreamBacktestsConfig {
   summaryIntervalMs: number;
 }
 
+export interface AuthConfig {
+  /** Operator auth is enforced only when a password is configured. */
+  enabled: boolean;
+  /** Shared operator password (verified server-side, constant-time). */
+  password: string;
+  /** HMAC key for session tokens; defaults to the password when unset. */
+  secret: string;
+  /** Session token lifetime in ms. */
+  ttlMs: number;
+}
+
 export interface OfficeServerConfig {
   port: number;
   corsOrigin: string;
@@ -51,6 +62,7 @@ export interface OfficeServerConfig {
   stream: StreamConfig;
   platform: PlatformConfig;
   downstreamBacktests: DownstreamBacktestsConfig;
+  auth: AuthConfig;
 }
 
 const num = (env: NodeJS.ProcessEnv, key: string, def: number): number => {
@@ -82,6 +94,14 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): OfficeServerCo
       'OFFICE_CONNECTOR_MODE=trading-lab requires TRADING_LAB_READ_URL and TRADING_LAB_READ_TOKEN',
     );
   }
+
+  const operatorPassword = str(env, 'OFFICE_OPERATOR_PASSWORD', '');
+  const auth: AuthConfig = {
+    enabled: operatorPassword !== '',
+    password: operatorPassword,
+    secret: str(env, 'OFFICE_AUTH_SECRET', operatorPassword),
+    ttlMs: num(env, 'OFFICE_AUTH_TTL_MS', 12 * 60 * 60 * 1000), // 12h
+  };
 
   const platformEnabled = env.OFFICE_PLATFORM_ENABLED === 'true' && connectorMode === 'trading-lab';
   const platform: PlatformConfig = {
@@ -126,5 +146,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): OfficeServerCo
       summaryRetries: num(env, 'OFFICE_BACKTEST_SUMMARY_RETRIES', 5),
       summaryIntervalMs: num(env, 'OFFICE_BACKTEST_SUMMARY_INTERVAL_MS', 500),
     },
+    auth,
   };
 }

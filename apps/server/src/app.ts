@@ -4,6 +4,7 @@ import { cors } from 'hono/cors';
 import { OFFICE_API, operatorMessageSchema, operatorConfirmSchema } from '@trading-office/office-gateway';
 import type { OfficeEvent } from '@trading-office/office-gateway';
 import type { OfficeServerConfig } from './config';
+import { constantTimeEqual, createSessionToken, verifySessionToken } from './auth/sessionToken';
 import { loadConfig } from './config';
 import type { OfficeReadConnector } from './connector/OfficeReadConnector';
 import { FixtureOfficeReadConnector } from './connector/FixtureOfficeReadConnector';
@@ -26,6 +27,41 @@ export function createOfficeApp(deps: OfficeAppDeps) {
   const { upgradeWebSocket, injectWebSocket } = createNodeWebSocket({ app });
 
   app.use('*', cors({ origin: deps.config.corsOrigin }));
+
+  const { auth } = deps.config;
+
+  // Operator login: exchange the shared password for a session token. Always
+  // reachable (never behind the guard). When auth is disabled it reports
+  // authRequired:false so the client knows it can proceed without a token.
+  app.post(OFFICE_API.operatorLogin, async (c) => {
+    if (!auth.enabled) return c.json({ authRequired: false, token: null });
+    const body = (await c.req.json().catch(() => null)) as { password?: unknown } | null;
+    const password = typeof body?.password === 'string' ? body.password : '';
+    if (!constantTimeEqual(password, auth.password)) {
+      return c.json({ error: { code: 'unauthorized', message: 'invalid operator password' } }, 401);
+    }
+    const now = Date.now();
+    const token = createSessionToken(auth.secret, { now, ttlMs: auth.ttlMs });
+    return c.json({ authRequired: true, token, expiresAt: new Date(now + auth.ttlMs).toISOString() });
+  });
+
+  // Guard every other office route + the WS upgrade. REST carries the token in
+  // `Authorization: Bearer`; the browser WebSocket cannot set headers, so the
+  // upgrade carries it as `?access_token`. Registered BEFORE the routes so it
+  // runs first; a no-op when auth is disabled. The token/secret never appear in
+  // a response body — only a stable reason code.
+  if (auth.enabled) {
+    app.use('/api/office/*', async (c, next) => {
+      if (c.req.path === OFFICE_API.operatorLogin) return next();
+      const header = c.req.header('authorization') ?? '';
+      const bearer = header.toLowerCase().startsWith('bearer ') ? header.slice(7) : '';
+      const token = bearer || c.req.query('access_token') || '';
+      if (!verifySessionToken(auth.secret, token, Date.now())) {
+        return c.json({ error: { code: 'unauthorized', message: 'authentication required' } }, 401);
+      }
+      return next();
+    });
+  }
 
   app.get(OFFICE_API.agentStatuses, async (c) => c.json(await deps.connector.getAgentStatuses()));
   app.get(OFFICE_API.agentActivityPattern, async (c) =>

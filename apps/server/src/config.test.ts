@@ -80,4 +80,30 @@ describe('loadConfig', () => {
     expect(c.downstreamBacktests.summaryRetries).toBe(5);
     expect(c.downstreamBacktests.summaryIntervalMs).toBe(500);
   });
+
+  describe('operator auth', () => {
+    it('is disabled when no operator password is set (open, as before)', () => {
+      expect(loadConfig({}).auth.enabled).toBe(false);
+    });
+
+    it('turns on when OFFICE_OPERATOR_PASSWORD is set; secret defaults to the password', () => {
+      const c = loadConfig({ OFFICE_OPERATOR_PASSWORD: 's3cret' });
+      expect(c.auth).toMatchObject({ enabled: true, password: 's3cret', secret: 's3cret' });
+      expect(c.auth.ttlMs).toBeGreaterThan(0);
+    });
+
+    it('an empty password string does not enable auth', () => {
+      expect(loadConfig({ OFFICE_OPERATOR_PASSWORD: '' }).auth.enabled).toBe(false);
+    });
+
+    it('OFFICE_AUTH_SECRET and OFFICE_AUTH_TTL_MS override the defaults', () => {
+      const c = loadConfig({
+        OFFICE_OPERATOR_PASSWORD: 's3cret',
+        OFFICE_AUTH_SECRET: 'hmac-key',
+        OFFICE_AUTH_TTL_MS: '1000',
+      });
+      expect(c.auth.secret).toBe('hmac-key');
+      expect(c.auth.ttlMs).toBe(1000);
+    });
+  });
 });
