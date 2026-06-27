@@ -1,6 +1,7 @@
 import type {
   AgentActivity,
   AgentStatusMap,
+  AgentTraces,
   BacktestSummary,
   BotHealth,
   Hypothesis,
@@ -20,6 +21,7 @@ import type { OfficeEvent } from './events';
 export interface OfficeGateway {
   getAgentStatuses(): Promise<AgentStatusMap>;
   getAgentActivity(agentId: string): Promise<AgentActivity>;
+  getAgentTraces(agentId: string): Promise<AgentTraces>;
   getHypotheses(): Promise<Hypothesis[]>;
   getBacktests(): Promise<BacktestSummary[]>;
   getBotHealth(): Promise<BotHealth[]>;

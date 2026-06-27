@@ -4,6 +4,7 @@ import type {
   agentStatusMapSchema,
   traceLineSchema,
   agentActivitySchema,
+  agentTracesSchema,
   hypothesisSchema,
   backtestSummarySchema,
   botHealthSchema,
@@ -25,6 +26,7 @@ export type { AgentStatus };
 export type AgentStatusMap = z.infer<typeof agentStatusMapSchema>;
 export type TraceLine = z.infer<typeof traceLineSchema>;
 export type AgentActivity = z.infer<typeof agentActivitySchema>;
+export type AgentTraces = z.infer<typeof agentTracesSchema>;
 export type Hypothesis = z.infer<typeof hypothesisSchema>;
 export type BacktestSummary = z.infer<typeof backtestSummarySchema>;
 export type BotHealth = z.infer<typeof botHealthSchema>;
