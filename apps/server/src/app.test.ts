@@ -33,6 +33,13 @@ describe('office HTTP routes', () => {
     expect(body.agentId).toBe('researcher');
   });
 
+  it('GET /api/office/agents/:id/traces returns agent traces', async () => {
+    const { app } = makeApp();
+    const res = await app.request(OFFICE_API.agentTraces('analyst'));
+    expect(res.status).toBe(200);
+    expect((await res.json()).agentId).toBe('analyst');
+  });
+
   it('POST operator message is accepted and INERT (no connector read, only an accepted event synchronously)', async () => {
     const { app, bus, connector } = makeApp();
     const spy = vi.spyOn(connector, 'getAgentStatuses');

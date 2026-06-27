@@ -67,6 +67,9 @@ export function createOfficeApp(deps: OfficeAppDeps) {
   app.get(OFFICE_API.agentActivityPattern, async (c) =>
     c.json(await deps.connector.getAgentActivity(c.req.param('agentId'))),
   );
+  app.get(OFFICE_API.agentTracesPattern, async (c) =>
+    c.json(await deps.connector.getAgentTraces(c.req.param('agentId'))),
+  );
   app.get(OFFICE_API.hypotheses, async (c) => c.json(await deps.connector.getHypotheses()));
   app.get(OFFICE_API.backtests, async (c) => c.json(await deps.connector.getBacktests()));
   app.get(OFFICE_API.bots, async (c) => c.json(await deps.connector.getBotHealth()));
