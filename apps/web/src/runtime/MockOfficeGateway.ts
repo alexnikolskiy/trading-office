@@ -2,6 +2,7 @@ import type { OfficeGateway } from './OfficeGateway';
 import type {
   AgentActivity,
   AgentStatusMap,
+  AgentTraces,
   BacktestSummary,
   BotHealth,
   Hypothesis,
@@ -51,6 +52,60 @@ export class MockOfficeGateway implements OfficeGateway {
   getBotHealth(): Promise<BotHealth[]> { return this.delay(BOTS); }
   getKnowledge(): Promise<KnowledgeEntry[]> { return this.delay(KNOWLEDGE); }
   getInfraStatus(): Promise<InfraStatus> { return this.delay(INFRA); }
+
+  getAgentTraces(agentId: string): Promise<AgentTraces> {
+    const now = new Date();
+    const agentSpanStartTime = new Date(now.getTime() - 1840).toISOString();
+    const llmSpanStartTime = new Date(now.getTime() - 1200).toISOString();
+    const toolSpanStartTime = new Date(now.getTime() - 400).toISOString();
+
+    const traces: AgentTraces = {
+      agentId,
+      reasonCode: null,
+      traces: [
+        {
+          traceId: 'mock-trace-1',
+          startTime: agentSpanStartTime,
+          status: 'ok',
+          latencyMs: 1840,
+          tokens: { prompt: 1200, completion: 320, total: 1520 },
+          costUsd: 0.018,
+          rootName: 'strategy-analyst',
+          spans: [
+            {
+              spanId: 'agent-1',
+              parentSpanId: null,
+              name: 'strategy-analyst',
+              kind: 'AGENT',
+              startTime: agentSpanStartTime,
+              latencyMs: 1840,
+              status: 'ok',
+            },
+            {
+              spanId: 'llm-1',
+              parentSpanId: 'agent-1',
+              name: 'invoke-claude',
+              kind: 'LLM',
+              startTime: llmSpanStartTime,
+              latencyMs: 800,
+              status: 'ok',
+              llm: { model: 'claude-sonnet-4-6', tokensIn: 1200, tokensOut: 320 },
+            },
+            {
+              spanId: 'tool-1',
+              parentSpanId: 'agent-1',
+              name: 'fetch-market-data',
+              kind: 'TOOL',
+              startTime: toolSpanStartTime,
+              latencyMs: 120,
+              status: 'ok',
+            },
+          ],
+        },
+      ],
+    };
+    return this.delay(traces);
+  }
 
   sendOperatorMessage(msg: OperatorMessage): Promise<OperatorMessageAccepted> {
     const k = ++this.counter;

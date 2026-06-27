@@ -75,6 +75,15 @@ describe('TradingLabHttpClient', () => {
     const c = new TradingLabHttpClient({ ...cfg, fetchImpl: vi.fn(async () => new Response('<<not json>>', { status: 200, headers: { 'content-type': 'application/json' } })) });
     await expect(c.getHypotheses()).rejects.toMatchObject({ office: { reason: 'upstream_bad_response' } });
   });
+
+  it('getAgentTraces calls /v1/agents/:id/traces with the bearer token', async () => {
+    const fetchImpl = vi.fn(async () => ok({ agentId: 'analyst', reasonCode: null, traces: [] }));
+    const client = new TradingLabHttpClient({ ...cfg, fetchImpl });
+    await client.getAgentTraces('analyst');
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(String(url)).toBe('http://lab:3100/v1/agents/analyst/traces');
+    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer secret');
+  });
 });
 
 const client = (fetchImpl: typeof fetch) =>

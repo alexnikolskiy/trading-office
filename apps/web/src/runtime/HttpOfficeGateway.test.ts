@@ -157,4 +157,13 @@ describe('HttpOfficeGateway', () => {
     expect(seen.some((s) => s === 'reconnecting' || s === 'disconnected')).toBe(true);
     off();
   });
+
+  it('reads agent traces over HTTP', async () => {
+    const dto = { agentId: 'analyst', reasonCode: null, traces: [] };
+    const fetchImpl = vi.fn(async (url: string) =>
+      url.endsWith(OFFICE_API.agentTraces('analyst')) ? jsonResponse(dto) : jsonResponse(null, false, 404),
+    );
+    const gw = new HttpOfficeGateway({ baseUrl: 'http://x', fetchImpl });
+    expect(await gw.getAgentTraces('analyst')).toEqual(dto);
+  });
 });

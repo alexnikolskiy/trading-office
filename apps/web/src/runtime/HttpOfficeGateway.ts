@@ -3,6 +3,7 @@ import {
   officeEventSchema,
   type AgentActivity,
   type AgentStatusMap,
+  type AgentTraces,
   type BacktestSummary,
   type BotHealth,
   type Hypothesis,
@@ -88,6 +89,7 @@ export class HttpOfficeGateway implements OfficeGateway {
 
   getAgentStatuses() { return this.get<AgentStatusMap>(OFFICE_API.agentStatuses); }
   getAgentActivity(agentId: string) { return this.get<AgentActivity>(OFFICE_API.agentActivity(agentId)); }
+  getAgentTraces(agentId: string) { return this.get<AgentTraces>(OFFICE_API.agentTraces(agentId)); }
   getHypotheses() { return this.get<Hypothesis[]>(OFFICE_API.hypotheses); }
   getBacktests() { return this.get<BacktestSummary[]>(OFFICE_API.backtests); }
   getBotHealth() { return this.get<BotHealth[]>(OFFICE_API.bots); }

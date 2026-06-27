@@ -110,3 +110,21 @@ describe('TradingLabReadConnector — graceful degradation (no throw on upstream
     await expect(c.getAgentActivity('boss')).rejects.toMatchObject({ office: { code: 'upstream_unauthorized', reason: 'auth_failed' } });
   });
 });
+
+describe('TradingLabReadConnector — getAgentTraces', () => {
+  it('getAgentTraces("boss") proxies to /v1/agents/system/traces and returns the dto', async () => {
+    const fetchImpl = vi.fn(async () => json({ agentId: 'system', reasonCode: null, traces: [] }));
+    const c = conn(fetchImpl as unknown as typeof fetch);
+    const out = await c.getAgentTraces('boss');
+    expect(String((fetchImpl.mock.calls[0] as unknown as [string])[0])).toBe('http://lab:3100/v1/agents/system/traces');
+    expect(out.reasonCode).toBeNull();
+    expect(out.agentId).toBe('boss'); // must be the OFFICE id, not the lab id ('system')
+  });
+
+  it('getAgentTraces for a no-source agent returns no-traces WITHOUT calling lab', async () => {
+    const fetchImpl = vi.fn(async () => json({}));
+    const c = conn(fetchImpl as unknown as typeof fetch);
+    expect(await c.getAgentTraces('evaluator')).toEqual({ agentId: 'evaluator', reasonCode: 'no-traces', traces: [] });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+});
