@@ -19,6 +19,22 @@ describe('AgentTracesView', () => {
     expect(await screen.findByText(/no traces/i)).toBeTruthy();
   });
 
+  it('renders without crashing on a self-referential cyclic parentSpanId', async () => {
+    withGateway(async () => ({
+      agentId: 'analyst', reasonCode: null,
+      traces: [{ traceId: 'cyc1', startTime: '2026-06-27T10:00:00.000Z', status: 'ok', latencyMs: 10,
+        tokens: null, costUsd: null, rootName: 'cycle-root',
+        spans: [
+          { spanId: 'x', parentSpanId: null, name: 'cycle-root', kind: 'AGENT', startTime: 'x', latencyMs: 10, status: 'ok' },
+          { spanId: 'y', parentSpanId: 'y', name: 'self-loop', kind: 'LLM', startTime: 'x', latencyMs: 5, status: 'ok' },
+        ] }],
+    }));
+    render(<AgentTracesView agentId="analyst" />);
+    const row = await screen.findByText(/cycle-root/);
+    fireEvent.click(row); // expand — must not infinite-recurse
+    expect(await screen.findByText('cycle-root')).toBeTruthy();
+  });
+
   it('lists traces and expands the span tree on click', async () => {
     withGateway(async () => ({
       agentId: 'analyst', reasonCode: null,

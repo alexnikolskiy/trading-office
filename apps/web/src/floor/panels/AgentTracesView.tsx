@@ -12,16 +12,20 @@ const REASON_TEXT: Record<string, string> = {
 
 function SpanTree({ spans }: { spans: TraceSpan[] }) {
   const childrenOf = (id: string | null) => spans.filter((s) => s.parentSpanId === id);
-  const renderSpans = (parentId: string | null, depth: number): ReactElement[] =>
-    childrenOf(parentId).flatMap((s) => [
-      <div key={s.spanId} className="trace__span" style={{ paddingLeft: depth * 12 }}>
-        <span className={`trace__kind trace__kind--${s.kind.toLowerCase()}`}>{s.kind}</span> {s.name}
-        <span className="trace__lat">{s.latencyMs}ms</span>
-        {s.status === 'error' && <span className="trace__err">!</span>}
-      </div>,
-      ...renderSpans(s.spanId, depth + 1),
-    ]);
-  return <div className="trace__tree">{renderSpans(null, 0)}</div>;
+  const renderSpans = (parentId: string | null, depth: number, visited: Set<string>): ReactElement[] =>
+    childrenOf(parentId).flatMap((s) => {
+      if (visited.has(s.spanId)) return []; // cycle/self-parent guard
+      const next = new Set(visited); next.add(s.spanId);
+      return [
+        <div key={s.spanId} className="trace__span" style={{ paddingLeft: depth * 12 }}>
+          <span className={`trace__kind trace__kind--${s.kind.toLowerCase()}`}>{s.kind}</span> {s.name}
+          <span className="trace__lat">{s.latencyMs}ms</span>
+          {s.status === 'error' && <span className="trace__err">!</span>}
+        </div>,
+        ...renderSpans(s.spanId, depth + 1, next),
+      ];
+    });
+  return <div className="trace__tree">{renderSpans(null, 0, new Set())}</div>;
 }
 
 function TraceRow({ trace }: { trace: Trace }) {

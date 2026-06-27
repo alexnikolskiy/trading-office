@@ -118,6 +118,7 @@ describe('TradingLabReadConnector — getAgentTraces', () => {
     const out = await c.getAgentTraces('boss');
     expect(String((fetchImpl.mock.calls[0] as unknown as [string])[0])).toBe('http://lab:3100/v1/agents/system/traces');
     expect(out.reasonCode).toBeNull();
+    expect(out.agentId).toBe('boss'); // must be the OFFICE id, not the lab id ('system')
   });
 
   it('getAgentTraces for a no-source agent returns no-traces WITHOUT calling lab', async () => {

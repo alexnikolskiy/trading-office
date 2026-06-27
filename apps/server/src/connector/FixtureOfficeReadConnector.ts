@@ -32,7 +32,7 @@ export class FixtureOfficeReadConnector implements OfficeReadConnector {
 
   getAgentStatuses(): Promise<AgentStatusMap> { return this.delay({ ...INITIAL_STATUSES }); }
   getAgentActivity(agentId: string): Promise<AgentActivity> { return this.delay(agentActivity(agentId)); }
-  getAgentTraces(agentId: string): Promise<AgentTraces> { return this.delay({ agentId, reasonCode: null, traces: [] }); }
+  getAgentTraces(agentId: string): Promise<AgentTraces> { return this.delay({ agentId, reasonCode: 'no-traces', traces: [] }); }
   getHypotheses(): Promise<Hypothesis[]> { return this.delay(HYPOTHESES); }
   getBacktests(): Promise<BacktestSummary[]> { return this.delay(BACKTESTS); }
   getBotHealth(): Promise<BotHealth[]> { return this.delay(BOTS); }

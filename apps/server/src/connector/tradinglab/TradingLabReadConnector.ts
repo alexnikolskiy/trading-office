@@ -48,7 +48,8 @@ export class TradingLabReadConnector {
     const labId = mapOfficeAgentIdToLab(agentId);
     if (!labId) return { agentId, reasonCode: 'no-traces', traces: [] };
     // Strict proxy: lab-level upstream errors propagate to app.onError (401/502).
-    return this.client.getAgentTraces(labId);
+    // Remap agentId: lab returns its own id (e.g. 'system'); force the OFFICE id back.
+    const dto = await this.client.getAgentTraces(labId); return { ...dto, agentId };
   }
 
   async getHypotheses(): Promise<Hypothesis[]> {
