@@ -389,8 +389,9 @@ git commit -m "feat(read-api): Phoenix trace DTOs + span-grouping mapper"
 import { describe, it, expect, vi } from 'vitest';
 import { PhoenixTraceReader } from './phoenix-trace-reader.ts';
 
+// NOTE (confirmed in Task A1): the Phoenix spans envelope key is `data`, not `spans`.
 const spansResponse = (spans: unknown[]) =>
-  new Response(JSON.stringify({ spans, next_cursor: null }), { status: 200, headers: { 'content-type': 'application/json' } });
+  new Response(JSON.stringify({ data: spans, next_cursor: null }), { status: 200, headers: { 'content-type': 'application/json' } });
 
 const agentSpan = (trace: string, name: string) => ({
   name, span_kind: 'AGENT', parent_id: null,
@@ -514,8 +515,9 @@ export class PhoenixTraceReader {
     try {
       const res = await this.fetchImpl(url, { headers, signal: ctrl.signal });
       if (!res.ok) throw new Error(`phoenix ${res.status}`);
-      const body = (await res.json()) as { spans?: RawPhoenixSpan[] };
-      return body.spans ?? [];
+      // Phoenix returns { data: [...], next_cursor } — confirmed live in Task A1 (NOT { spans }).
+      const body = (await res.json()) as { data?: RawPhoenixSpan[] };
+      return body.data ?? [];
     } finally {
       clearTimeout(timer);
     }
