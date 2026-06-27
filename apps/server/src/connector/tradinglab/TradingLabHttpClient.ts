@@ -3,6 +3,7 @@ import type {
   LabCursorEnvelope, LabPageEnvelope, LabHealth, LabReady, LabAuthz, LabCompletionSummary,
 } from './labDtos';
 import type { LabReadReasonCode } from './labReadSource';
+import type { AgentTraces } from '@trading-office/office-gateway';
 
 export interface OfficeUpstreamError extends Error {
   office: {
@@ -40,6 +41,9 @@ export class TradingLabHttpClient {
   }
   getAgent(agentId: string): Promise<LabAgentActivity> {
     return this.getJson(`/v1/agents/${encodeURIComponent(agentId)}`, true);
+  }
+  getAgentTraces(agentId: string): Promise<AgentTraces> {
+    return this.getJson(`/v1/agents/${encodeURIComponent(agentId)}/traces`, true);
   }
   getHypotheses(): Promise<LabPageEnvelope<LabHypothesisListItem>> {
     return this.getJson('/v1/hypotheses', true);
