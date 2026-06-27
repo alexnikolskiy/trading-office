@@ -9,11 +9,20 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { OperatorEvidenceView } from './panels/operatorTranscript';
 import { useNavigate } from 'react-router-dom';
 import { type FloorThemeName } from '@trading-office/trading-lab-floor';
-import { useRuntimeStore, useConnectionStatus } from '../runtime/RuntimeContext';
+import {
+  useGateway,
+  useRuntimeStore,
+  useConnectionStatus,
+  useAgentStatuses,
+} from '../runtime/RuntimeContext';
 import { applyStatusToScene } from '../runtime/sceneBridge';
-import { INITIAL_STATUSES } from '@trading-office/office-fixtures';
 import { CityBackdrop } from '../city/CityBackdrop';
-import { buildFloorConfig, panelTargetToObjectId } from './floorConfig';
+import {
+  agentPresenceKey,
+  buildFloorConfig,
+  filterPresentAgents,
+  panelTargetToObjectId,
+} from './floorConfig';
 import { selectionKey, type RouteSelection } from './floorSelection';
 import {
   opensDock,
@@ -30,11 +39,23 @@ const OPERATOR_EVIDENCE = { kind: 'operator-evidence' } as const;
 
 export function FloorScreen({ themeName = 'day' }: { themeName?: FloorThemeName }) {
   const navigate = useNavigate();
+  const gateway = useGateway();
   const store = useRuntimeStore();
   const connection = useConnectionStatus();
+  const statuses = useAgentStatuses();
   const degraded = connection === 'reconnecting' || connection === 'disconnected' || connection === 'error';
 
-  const config = useMemo(() => buildFloorConfig(themeName), [themeName]);
+  // Seat agents at desks data-driven: only those the gateway reports a live
+  // status for (i.e. a real trading-lab source) get a sprite — others leave an
+  // honest empty desk. Keyed on the *set* of present agents (not status values)
+  // so routine status ticks don't rebuild the Pixi scene.
+  const baseConfig = useMemo(() => buildFloorConfig(themeName), [themeName]);
+  const presenceKey = agentPresenceKey(statuses);
+  const config = useMemo(
+    () => filterPresentAgents(baseConfig, statuses),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [baseConfig, presenceKey],
+  );
   const targetToObject = useMemo(() => panelTargetToObjectId(config), [config]);
   const agentInfos = useMemo<FloorAgentInfo[]>(
     () => config.agents.map((a) => ({ id: a.id, role: a.role })),
@@ -104,9 +125,25 @@ export function FloorScreen({ themeName = 'day' }: { themeName?: FloorThemeName 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scene, selKey]);
 
+  // Seed the floor with the gateway's CURRENT agent statuses (real data in
+  // connected mode, the mock pool in mock mode — never a hard-coded fixture in
+  // lab mode). Live updates then arrive via the event-stream binding. On
+  // failure we leave the floor empty and let the degraded banner explain — no
+  // fallback to fake statuses.
   useEffect(() => {
-    store.setStatuses(INITIAL_STATUSES);
-  }, [store]);
+    let alive = true;
+    gateway
+      .getAgentStatuses()
+      .then((m) => {
+        if (alive) store.setStatuses(m);
+      })
+      .catch(() => {
+        /* surfaced via connection state; no fake fallback */
+      });
+    return () => {
+      alive = false;
+    };
+  }, [gateway, store]);
 
   // The docks fill the side gap exactly (screen edge → office edge), so they
   // stretch right up to the office. Measure that gap and expose it as a CSS var.

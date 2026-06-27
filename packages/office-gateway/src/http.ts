@@ -7,6 +7,7 @@ export const OFFICE_API = {
   bots: '/api/office/bots',
   knowledge: '/api/office/knowledge',
   infra: '/api/office/infra',
+  operatorLogin: '/api/office/operator/login',
   operatorMessages: '/api/office/operator/messages',
   operatorConfirm: '/api/office/operator/confirm',
   events: '/api/office/events',

@@ -9,6 +9,8 @@ import {
 import { MockOfficeGateway } from './MockOfficeGateway';
 import { HttpOfficeGateway } from './HttpOfficeGateway';
 import { OfficeRuntimeStore } from './OfficeRuntimeStore';
+import { bindGatewayToStore } from './runtimeBinding';
+import { readPersistedToken } from '../session/SessionContext';
 import type { OfficeGateway } from './OfficeGateway';
 import type { ConnectionStatus } from './OfficeRuntimeStore';
 import type { AgentStatusMap } from './types';
@@ -24,16 +26,13 @@ function createGateway(): OfficeGateway {
   const mode = import.meta.env.VITE_OFFICE_MODE ?? 'mock';
   if (mode === 'connected') {
     const baseUrl = import.meta.env.VITE_OFFICE_GATEWAY_URL ?? 'http://localhost:8787';
-    return new HttpOfficeGateway({ baseUrl, wsUrl: import.meta.env.VITE_OFFICE_GATEWAY_WS_URL });
+    return new HttpOfficeGateway({
+      baseUrl,
+      wsUrl: import.meta.env.VITE_OFFICE_GATEWAY_WS_URL,
+      getToken: readPersistedToken,
+    });
   }
   return new MockOfficeGateway();
-}
-
-interface ConnectionSignaling {
-  subscribeConnection(cb: (s: ConnectionStatus) => void): () => void;
-}
-function isConnectionSignaling(g: unknown): g is ConnectionSignaling {
-  return typeof (g as { subscribeConnection?: unknown }).subscribeConnection === 'function';
 }
 
 export function RuntimeProvider({ children }: { children: ReactNode }) {
@@ -41,12 +40,10 @@ export function RuntimeProvider({ children }: { children: ReactNode }) {
     () => ({ gateway: createGateway(), store: new OfficeRuntimeStore() }),
     [],
   );
-  useEffect(() => {
-    if (isConnectionSignaling(value.gateway)) {
-      return value.gateway.subscribeConnection((s) => value.store.setConnection(s));
-    }
-    value.store.setConnection('connected'); // mock mode: always connected
-  }, [value]);
+  // Pump live connection state AND the office event stream into the store. The
+  // eager event subscription also opens the WebSocket up-front so the floor
+  // gets the on-connect status snapshot without a panel having to be opened.
+  useEffect(() => bindGatewayToStore(value.gateway, value.store), [value]);
   return <RuntimeContext.Provider value={value}>{children}</RuntimeContext.Provider>;
 }
 
