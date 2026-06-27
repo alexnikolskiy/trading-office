@@ -1,4 +1,4 @@
-import type { AgentStatusMap, AgentActivity, Hypothesis, BacktestSummary } from '@trading-office/office-gateway';
+import type { AgentStatusMap, AgentActivity, AgentTraces, Hypothesis, BacktestSummary } from '@trading-office/office-gateway';
 import type { TradingLabHttpClient } from './TradingLabHttpClient';
 import type { LabReadSourceTracker } from './labReadSource';
 import { mapAgentStatuses, mapAgentActivity, mapHypothesis, mapBacktest, mapOfficeAgentIdToLab } from './mappers';
@@ -42,6 +42,13 @@ export class TradingLabReadConnector {
     // app error handler can map it to a typed status (401/502), not a generic 500.
     // mapAgentActivity maps the lab agentId back to the office id (e.g. system → boss).
     return mapAgentActivity(await this.client.getAgent(labId));
+  }
+
+  async getAgentTraces(agentId: string): Promise<AgentTraces> {
+    const labId = mapOfficeAgentIdToLab(agentId);
+    if (!labId) return { agentId, reasonCode: 'no-traces', traces: [] };
+    // Strict proxy: lab-level upstream errors propagate to app.onError (401/502).
+    return this.client.getAgentTraces(labId);
   }
 
   async getHypotheses(): Promise<Hypothesis[]> {
