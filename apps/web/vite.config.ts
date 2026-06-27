@@ -15,7 +15,10 @@ export default defineConfig({
     dedupe: ['pixi.js', 'pixi-viewport', 'react', 'react-dom'],
   },
   test: {
-    environment: 'node',
-    include: ['src/**/*.test.ts'],
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: ['./src/test/setup.ts'],
+    include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+    testTimeout: 10000,
   },
 });
