@@ -34,8 +34,9 @@ jobs:
       - name: Test
         run: npm run test
 
-      - name: Verify floor assets are in sync
-        run: npm run verify:assets
-
+      # The web/examples build's prebuild step syncs the floor assets from the
+      # canonical package into the (gitignored) public dirs, so the production
+      # build is the real exercise of the asset pipeline — a separate
+      # verify:assets --check would just fail on the empty fresh checkout.
       - name: Build
         run: npm run build
